@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}{{ title }} | Veridyn Recruit{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container prose">
+    <h1>{{ title }}</h1>
+    {% if kind == 'privacy' %}
+    <p>When you request a resource from Veridyn Recruit we collect your name, work email, organisation, job role and, optionally, organisation size. We use this information to send you the requested resource and related communications about Veridyn Recruit.</p>
+    <p>Marketing lead information is stored separately from candidate recruitment records. You can unsubscribe at any time or ask us to delete your details.</p>
+    <p class="small-note">Placeholder policy — replace with your organisation's full privacy policy before going live.</p>
+    {% else %}
+    <p>Resources provided by Veridyn Recruit are for general guidance to support safer, more consistent recruitment processes. They do not constitute legal advice and do not guarantee regulatory compliance.</p>
+    <p class="small-note">Placeholder terms — replace with your organisation's full terms before going live.</p>
+    {% endif %}
+    <p><a class="text-link" href="/care-recruitment-compliance-checklist">← Back</a></p>
+  </div>
+</section>
+{% endblock %}

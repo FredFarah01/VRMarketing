@@ -1,0 +1,21 @@
+{% extends "base.html" %}
+{% block title %}Admin Login | Veridyn Recruit{% endblock %}
+{% block meta %}<meta name="robots" content="noindex">{% endblock %}
+{% block body_class %}page-admin{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<section class="section">
+  <div class="container" style="max-width:440px">
+    <div class="card form-card">
+      <h1 class="form-card__title">Platform Admin</h1>
+      {% if error %}<div class="form-alert" role="alert">{{ error }}</div>{% endif %}
+      <form method="post" class="lead-form">
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="field"><label for="username">Username</label><input id="username" name="username" autocomplete="username" required></div>
+        <div class="field"><label for="password">Password</label><input id="password" name="password" type="password" autocomplete="current-password" required></div>
+        <button class="btn btn--primary btn--block" type="submit">Sign in</button>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

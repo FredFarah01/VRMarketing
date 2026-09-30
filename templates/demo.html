@@ -1,0 +1,43 @@
+{% extends "base.html" %}
+{% block title %}Request a Demo | Veridyn Recruit{% endblock %}
+{% block meta %}<meta name="description" content="Request a demo of Veridyn Recruit, recruitment and compliance software for UK care providers.">{% endblock %}
+{% block content %}
+<section class="hero hero--compact" aria-labelledby="demo-h1">
+  <div class="container hero__grid hero__grid--form">
+    <div class="hero__copy">
+      <p class="eyebrow">Request a demo</p>
+      <h1 id="demo-h1">See Veridyn Recruit in Action</h1>
+      <p class="hero__body">Tell us a little about your organisation and we'll arrange a walkthrough of how Veridyn Recruit can bring applications, checks and approvals into one structured workflow.</p>
+      <ul class="hero__benefits">
+        <li>A walkthrough tailored to your recruitment process</li>
+        <li>See the candidate portal and recruitment dashboard</li>
+        <li>No obligation</li>
+      </ul>
+    </div>
+    <div class="card form-card">
+      <div id="demo-success" class="form-success" hidden tabindex="-1">
+        <span class="ty__icon" aria-hidden="true">✓</span>
+        <h2>Thanks — we'll be in touch</h2>
+        <p>A member of the Veridyn Recruit team will contact you to arrange your demo.</p>
+        <a class="text-link" href="/care-recruitment-compliance-checklist">Back to the checklist page</a>
+      </div>
+      <form id="demo-form" class="lead-form" novalidate>
+        <h2 class="form-card__title">Request a Demo</h2>
+        <div class="form-alert" role="alert" aria-live="assertive" hidden></div>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="hp" aria-hidden="true"><label for="website">Website</label><input type="text" id="website" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="field-row">
+          <div class="field"><label for="first_name">First Name <span class="req" aria-hidden="true">*</span></label><input id="first_name" name="first_name" autocomplete="given-name" required aria-describedby="first_name-error"><p class="field-error" id="first_name-error"></p></div>
+          <div class="field"><label for="last_name">Last Name <span class="req" aria-hidden="true">*</span></label><input id="last_name" name="last_name" autocomplete="family-name" required aria-describedby="last_name-error"><p class="field-error" id="last_name-error"></p></div>
+        </div>
+        <div class="field"><label for="email">Work Email <span class="req" aria-hidden="true">*</span></label><input id="email" name="email" type="email" autocomplete="email" required aria-describedby="email-error"><p class="field-error" id="email-error"></p></div>
+        <div class="field"><label for="organisation">Organisation Name <span class="req" aria-hidden="true">*</span></label><input id="organisation" name="organisation" autocomplete="organization" required aria-describedby="organisation-error"><p class="field-error" id="organisation-error"></p></div>
+        <div class="field"><label for="phone">Phone <span class="opt">(optional)</span></label><input id="phone" name="phone" type="tel" autocomplete="tel"></div>
+        <div class="field"><label for="message">Anything we should know? <span class="opt">(optional)</span></label><textarea id="message" name="message" rows="3" maxlength="2000"></textarea></div>
+        <button type="submit" class="btn btn--primary btn--lg btn--block">Request My Demo</button>
+        <p class="form-legal">See our <a href="/privacy">Privacy Policy</a>.</p>
+      </form>
+    </div>
+  </div>
+</section>
+{% endblock %}

@@ -1,0 +1,73 @@
+{% extends "base.html" %}
+{% block title %}Marketing › Leads | Veridyn Recruit Admin{% endblock %}
+{% block meta %}<meta name="robots" content="noindex">{% endblock %}
+{% block body_class %}page-admin{% endblock %}
+{% block header %}
+<header class="site-header site-header--admin">
+  <div class="container container--wide site-header__inner">
+    <a href="/admin/marketing/leads">{{ logo(true) }}</a>
+    <nav class="site-nav" aria-label="Admin">
+      <span class="site-nav__crumb">Platform Admin › Marketing › <strong>Leads</strong></span>
+      <form method="post" action="/admin/logout"><button class="btn btn--ghost btn--sm" type="submit">Log out</button></form>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<section class="admin">
+  <div class="container container--wide">
+    <div class="admin__head">
+      <div><h1>Leads</h1><p>{{ leads|length }} of {{ total }} leads</p></div>
+      <a class="btn btn--primary btn--sm" href="/admin/marketing/leads.csv?{{ request.query_string.decode() }}">Export CSV</a>
+    </div>
+    <div class="funnel" aria-label="Funnel (unique visitors per event)">
+      {% for name, n in funnel %}<div class="funnel__step"><span>{{ name.replace('_',' ') }}</span><strong>{{ n }}</strong></div>{% endfor %}
+    </div>
+    <form class="filters" method="get" role="search">
+      <label class="sr-only" for="q">Search</label>
+      <input id="q" name="q" type="search" value="{{ filters.q }}" placeholder="Search name, email, organisation, source">
+      <label class="sr-only" for="f-status">Status</label>
+      <select id="f-status" name="status"><option value="">All statuses</option>{% for s in statuses %}<option {{ 'selected' if filters.status==s }}>{{ s }}</option>{% endfor %}</select>
+      <label class="sr-only" for="f-role">Role</label>
+      <select id="f-role" name="role"><option value="">All roles</option>{% for s in roles %}<option {{ 'selected' if filters.role==s }}>{{ s }}</option>{% endfor %}</select>
+      <label class="sr-only" for="f-size">Organisation size</label>
+      <select id="f-size" name="size"><option value="">All sizes</option>{% for s in sizes %}<option {{ 'selected' if filters.size==s }}>{{ s }}</option>{% endfor %}</select>
+      <label class="sr-only" for="f-temp">Temperature</label>
+      <select id="f-temp" name="temperature"><option value="">All scores</option>{% for s in ['Hot','Warm','Cold'] %}<option {{ 'selected' if filters.temperature==s }}>{{ s }}</option>{% endfor %}</select>
+      <button class="btn btn--primary btn--sm" type="submit">Filter</button>
+      <a class="text-link" href="/admin/marketing/leads">Reset</a>
+    </form>
+    <div class="table-scroll card">
+      <table class="admin-table">
+        <thead><tr><th>Name</th><th>Organisation</th><th>Email</th><th>Role</th><th>Organisation Size</th><th>Lead Magnet</th><th>Source</th><th>Date</th><th>Score</th><th>Status</th></tr></thead>
+        <tbody>
+        {% for l in leads %}
+          <tr>
+            <td><strong>{{ l.first_name }} {{ l.last_name }}</strong></td>
+            <td>{{ l.organisation }}</td>
+            <td><a href="mailto:{{ l.email }}">{{ l.email }}</a></td>
+            <td>{{ l.job_role }}</td>
+            <td>{{ l.organisation_size or '—' }}</td>
+            <td>{{ l.lead_magnet }}</td>
+            <td>{{ l.source or 'direct' }}{% if l.utm_campaign %}<br><small>{{ l.utm_medium or '' }} / {{ l.utm_campaign }}</small>{% endif %}</td>
+            <td>{{ l.created_at[:10] }}<br><small>{{ l.created_at[11:16] }} UTC</small></td>
+            <td><span class="pill pill--{{ {'Hot':'red','Warm':'amber','Cold':'slate'}[l.lead_temperature] }}">{{ l.lead_temperature }} · {{ l.lead_score }}</span></td>
+            <td>
+              <form method="post" action="/admin/marketing/leads/{{ l.lead_id }}/status" class="status-form">
+                <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+                <label class="sr-only" for="st-{{ l.lead_id }}">Status for {{ l.first_name }} {{ l.last_name }}</label>
+                <select id="st-{{ l.lead_id }}" name="status" onchange="this.form.submit()">{% for s in statuses %}<option {{ 'selected' if l.status==s }}>{{ s }}</option>{% endfor %}</select>
+                <noscript><button type="submit">Save</button></noscript>
+              </form>
+            </td>
+          </tr>
+        {% else %}
+          <tr><td colspan="10" class="empty">No leads match your filters.</td></tr>
+        {% endfor %}
+        </tbody>
+      </table>
+    </div>
+  </div>
+</section>
+{% endblock %}

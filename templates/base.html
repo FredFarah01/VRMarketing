@@ -1,0 +1,50 @@
+<!doctype html>
+<html lang="en-GB">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>{% block title %}Veridyn Recruit{% endblock %}</title>
+  {% block meta %}{% endblock %}
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Poppins:ital,wght@0,300;0,400;0,500;0,600;0,700;1,300;1,400&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="{{ url_for('static', filename='css/styles.css') }}">
+  <link rel="icon" href="{{ url_for('static', filename='img/favicon.svg') }}" type="image/svg+xml">
+</head>
+<body class="{% block body_class %}{% endblock %}">
+  <a class="skip-link" href="#main">Skip to content</a>
+  {% macro logo(light=true) -%}
+  <span class="logo {{ 'logo--light' if light else 'logo--dark' }}">
+    <svg class="logo__mark" viewBox="0 0 40 40" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="#18b389" stroke-width="4"/><path d="M12 20.5l5.5 5.5L29 14" fill="none" stroke="{{ '#ffffff' if light else '#0e1a3a' }}" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg>
+    <span class="logo__word"><strong>veridyn</strong><span>Recruit</span></span>
+  </span>
+  {%- endmacro %}
+  {% block header %}
+  <header class="site-header">
+    <div class="container site-header__inner">
+      <a href="/care-recruitment-compliance-checklist" aria-label="Veridyn Recruit home">{{ logo(true) }}</a>
+      <nav class="site-nav" aria-label="Primary">
+        <a href="/care-recruitment-compliance-checklist#product" class="site-nav__link hide-sm">Product</a>
+        <a href="/care-recruitment-compliance-checklist#how-it-works" class="site-nav__link hide-sm">How It Works</a>
+        <a href="/login" class="site-nav__link">Login</a>
+        <a href="/demo" class="btn btn--primary btn--sm" data-track="demo_cta_clicked">Request Demo</a>
+      </nav>
+    </div>
+  </header>
+  {% endblock %}
+  <main id="main">{% block content %}{% endblock %}</main>
+  {% block footer %}
+  <footer class="site-footer">
+    <div class="container site-footer__inner">
+      {{ logo(true) }}
+      <p class="site-footer__text">Recruitment and compliance software built around the workflows used by UK care providers.</p>
+      <nav class="site-footer__links" aria-label="Legal">
+        <a href="/privacy">Privacy Policy</a><a href="/terms">Terms</a><a href="/login">Login</a>
+      </nav>
+      <p class="site-footer__copy">&copy; 2026 Veridyn Recruit. All rights reserved.</p>
+    </div>
+  </footer>
+  {% endblock %}
+  <script src="{{ url_for('static', filename='js/main.js') }}" defer></script>
+</body>
+</html>

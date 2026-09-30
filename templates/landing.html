@@ -1,0 +1,352 @@
+{% extends "base.html" %}
+{% block title %}Free Care Recruitment Compliance Checklist 2026 | Veridyn Recruit{% endblock %}
+{% block meta %}
+  {% set desc = "Download Veridyn Recruit's free 2026 Care Recruitment Compliance Checklist for UK care providers. Review candidate applications, employment histories, references, DBS, Right to Work and recruitment documentation." %}
+  <meta name="description" content="{{ desc }}">
+  <link rel="canonical" href="{{ canonical }}">
+  <meta property="og:type" content="website">
+  <meta property="og:site_name" content="Veridyn Recruit">
+  <meta property="og:title" content="Free Care Recruitment Compliance Checklist 2026 | Veridyn Recruit">
+  <meta property="og:description" content="{{ desc }}">
+  <meta property="og:url" content="{{ canonical }}">
+  <meta property="og:locale" content="en_GB">
+  <meta name="twitter:card" content="summary_large_image">
+  <meta name="twitter:title" content="Free Care Recruitment Compliance Checklist 2026 | Veridyn Recruit">
+  <meta name="twitter:description" content="{{ desc }}">
+{% endblock %}
+{% block body_class %}page-landing{% endblock %}
+{% block content %}
+
+<!-- HERO -->
+<section class="hero" aria-labelledby="hero-title">
+  <div class="container hero__grid">
+    <div class="hero__copy">
+      <p class="eyebrow">Free 2026 care recruitment resource</p>
+      <h1 id="hero-title">Is Your Care Recruitment Process <span class="t-green">Inspection-Ready?</span></h1>
+      <p class="hero__sub">Download the free 2026 Care Recruitment Compliance Checklist</p>
+      <p class="hero__body">Get a practical step-by-step checklist designed for UK care providers to help you review candidate recruitment files, identify missing information and build a more consistent recruitment process.</p>
+      <ul class="hero__benefits">
+        <li>Review every candidate file against 13 key recruitment areas</li>
+        <li>Spot missing references, checks and gap explanations</li>
+        <li>Build a clearer, more consistent recruitment audit trail</li>
+      </ul>
+      <div class="hero__cta">
+        <a href="#get-checklist" class="btn btn--primary btn--lg js-checklist-cta">Get My Free Checklist</a>
+        <p class="micro">Free download &bull; Practical checklist &bull; Built for UK care providers</p>
+      </div>
+    </div>
+    <div class="hero__visual">
+      <div class="doc-stack" role="img" aria-label="Cover of the Veridyn Recruit 2026 Care Recruitment Compliance Checklist">
+        <div class="doc doc--back" aria-hidden="true"></div>
+        <div class="doc doc--mid" aria-hidden="true">
+          <div class="doc-lines">
+            <p><span class="cb is-on"></span>Proof of identity verified</p>
+            <p><span class="cb is-on"></span>Full employment history</p>
+            <p><span class="cb is-on"></span>Gap explanations recorded</p>
+            <p><span class="cb"></span>References received</p>
+            <p><span class="cb"></span>Enhanced DBS</p>
+          </div>
+        </div>
+        <div class="doc doc--front">
+          <div class="doc__top">
+            <span class="doc__brand"><svg viewBox="0 0 40 40" width="18" height="18" aria-hidden="true"><circle cx="20" cy="20" r="17" fill="none" stroke="#18b389" stroke-width="4"/><path d="M12 20.5l5.5 5.5L29 14" fill="none" stroke="#fff" stroke-width="4.2" stroke-linecap="round" stroke-linejoin="round"/></svg> VERIDYN RECRUIT</span>
+            <span class="doc__tag">FREE PDF</span>
+          </div>
+          <div class="doc__year">2026</div>
+          <div class="doc__title">CARE RECRUITMENT<br>COMPLIANCE CHECKLIST</div>
+          <p class="doc__sub">A practical recruitment checklist for UK care providers</p>
+          <div class="doc__chevrons" aria-hidden="true">
+            <svg viewBox="0 0 60 60" width="44" height="44"><path d="M8 44l22-16 22 16M8 34l22-16 22 16M8 24l22-16 22 16" fill="none" stroke="#18b389" stroke-width="3"/></svg>
+          </div>
+          <ul class="doc__list" aria-hidden="true">
+            <li>Application &amp; identity</li><li>Employment history &amp; gaps</li><li>References &amp; DBS</li><li>Right to Work</li><li>Safeguarding &amp; approval</li>
+          </ul>
+          <div class="doc__foot"><span>13 sections</span><span>Ready to use</span></div>
+        </div>
+        <div class="float-badge float-badge--a" aria-hidden="true"><span class="tick-dot">✓</span> Right to Work checked</div>
+        <div class="float-badge float-badge--b" aria-hidden="true"><span class="tick-dot tick-dot--amber">!</span> 1 gap to explain</div>
+      </div>
+    </div>
+  </div>
+  <div class="hero__curve" aria-hidden="true"></div>
+</section>
+
+<!-- LEAD FORM -->
+<section class="form-section" id="get-checklist" aria-labelledby="form-title">
+  <div class="container form-section__grid">
+    <div class="form-section__intro">
+      <p class="eyebrow">Instant access</p>
+      <h2 id="form-title">Get Your Free Checklist</h2>
+      <p>Enter your details below and we'll send you the checklist.</p>
+      <blockquote class="quote-card">
+        <p>Help ensure every new care worker goes through a structured recruitment and compliance process before being approved for work.</p>
+      </blockquote>
+      <ul class="check-list check-list--compact">
+        <li>Application information</li><li>Identity verification</li><li>Full employment and activity history</li><li>Employment gap explanations</li><li>References</li><li>DBS checks</li><li>Right to Work checks</li><li>Qualifications and training</li><li>Safeguarding assessment</li><li>Candidate documentation</li><li>Interview and assessment records</li><li>Final recruitment approval</li><li>Recruitment audit trail</li>
+      </ul>
+    </div>
+    <div class="card form-card">
+      <form id="lead-form" class="lead-form" novalidate action="/api/leads" method="post">
+        <div class="form-alert" role="alert" aria-live="assertive" hidden></div>
+        <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+        <div class="hp" aria-hidden="true"><label for="website">Website</label><input type="text" id="website" name="website" tabindex="-1" autocomplete="off"></div>
+        <div class="field-row">
+          <div class="field">
+            <label for="first_name">First Name <span class="req" aria-hidden="true">*</span></label>
+            <input id="first_name" name="first_name" type="text" autocomplete="given-name" required maxlength="80" aria-describedby="first_name-error">
+            <p class="field-error" id="first_name-error"></p>
+          </div>
+          <div class="field">
+            <label for="last_name">Last Name <span class="req" aria-hidden="true">*</span></label>
+            <input id="last_name" name="last_name" type="text" autocomplete="family-name" required maxlength="80" aria-describedby="last_name-error">
+            <p class="field-error" id="last_name-error"></p>
+          </div>
+        </div>
+        <div class="field">
+          <label for="email">Work Email <span class="req" aria-hidden="true">*</span></label>
+          <input id="email" name="email" type="email" inputmode="email" autocomplete="email" required maxlength="254" aria-describedby="email-error">
+          <p class="field-error" id="email-error"></p>
+        </div>
+        <div class="field">
+          <label for="organisation">Organisation Name <span class="req" aria-hidden="true">*</span></label>
+          <input id="organisation" name="organisation" type="text" autocomplete="organization" required maxlength="160" aria-describedby="organisation-error">
+          <p class="field-error" id="organisation-error"></p>
+        </div>
+        <div class="field-row">
+          <div class="field">
+            <label for="job_role">Job Role <span class="req" aria-hidden="true">*</span></label>
+            <select id="job_role" name="job_role" required aria-describedby="job_role-error">
+              <option value="">Select your role</option>
+              {% for r in job_roles %}<option value="{{ r }}">{{ r }}</option>{% endfor %}
+            </select>
+            <p class="field-error" id="job_role-error"></p>
+          </div>
+          <div class="field">
+            <label for="organisation_size">Number of Employees / Care Workers <span class="opt">(optional)</span></label>
+            <select id="organisation_size" name="organisation_size" aria-describedby="organisation_size-error">
+              <option value="">Select</option>
+              {% for s in org_sizes %}<option value="{{ s }}">{{ s }}</option>{% endfor %}
+            </select>
+            <p class="field-error" id="organisation_size-error"></p>
+          </div>
+        </div>
+        <div class="field field--check">
+          <input id="consent" name="consent" type="checkbox" required aria-describedby="consent-error">
+          <label for="consent">I agree to receive the requested resource and related communications from Veridyn Recruit. I can unsubscribe at any time. <span class="req" aria-hidden="true">*</span></label>
+          <p class="field-error" id="consent-error"></p>
+        </div>
+        <button type="submit" class="btn btn--primary btn--lg btn--block">Send Me The Checklist</button>
+        <p class="form-legal">Read our <a href="/privacy">Privacy Policy</a> and <a href="/terms">Terms</a>. <span class="req" aria-hidden="true">*</span> Required field.</p>
+      </form>
+    </div>
+  </div>
+</section>
+
+<!-- PROBLEM -->
+<section class="section" aria-labelledby="problem-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">The challenge</p>
+      <h2 id="problem-title">Recruiting Care Staff Shouldn't Mean Chasing Paperwork</h2>
+      <p>Care recruitment can involve applications, employment histories, references, DBS checks, Right to Work evidence, safeguarding assessments and numerous supporting documents.</p>
+      <p>When those processes are spread across emails, spreadsheets and folders, it becomes harder to see what is complete, what is missing and which candidates are ready to progress.</p>
+    </div>
+    <div class="grid grid--3">
+      {% for icon, t, d in [
+        ('doc','Missing Documents','Candidate files can remain incomplete while administrators manually chase outstanding information.'),
+        ('gap','Employment Gaps','Reviewing employment and activity histories manually can make unexplained gaps difficult to identify consistently.'),
+        ('ref','Reference Chasing','Recruitment teams spend valuable time requesting, tracking and following up references.'),
+        ('shield','DBS &amp; Right to Work','Important pre-employment checks need to be recorded and tracked clearly.'),
+        ('status','No Clear Candidate Status','Teams need an immediate view of where each candidate sits within the recruitment process.'),
+        ('trail','Fragmented Audit Trail','Recruitment evidence spread across multiple systems makes oversight unnecessarily difficult.')] %}
+      <article class="card problem-card">
+        <span class="icon-badge icon-badge--{{ icon }}" aria-hidden="true"></span>
+        <h3>{{ t|safe }}</h3>
+        <p>{{ d }}</p>
+      </article>
+      {% endfor %}
+    </div>
+    <p class="section-close">Veridyn Recruit brings the recruitment journey together in one structured workflow.</p>
+  </div>
+</section>
+
+<!-- WHAT'S INSIDE -->
+<section class="section section--mint" aria-labelledby="inside-title">
+  <div class="container inside">
+    <div class="inside__copy">
+      <p class="eyebrow">What's inside the free checklist</p>
+      <h2 id="inside-title">Know What to Check Before a Candidate Is Cleared</h2>
+      <p>Thirteen practical sections to work through for every new care worker — from the first application through to final recruitment approval.</p>
+      <p class="small-note">Designed to support safer, more consistent recruitment processes.</p>
+      <a href="#get-checklist" class="btn btn--primary btn--lg js-checklist-cta">Download the Free Checklist</a>
+    </div>
+    <ol class="numbered-list">
+      {% for item in ['Candidate Application','Identity &amp; Contact Details','Employment &amp; Activity History','Employment Gap Explanations','References','DBS Checks','Right to Work','Qualifications &amp; Training','Safeguarding Assessment','Interview &amp; Suitability','Required Documentation','Final Recruitment Review','Recruitment Audit Trail'] %}
+      <li><span class="numbered-list__n">{{ '%02d' % loop.index }}</span><span class="numbered-list__t">{{ item|safe }}</span><span class="numbered-list__c" aria-hidden="true">✓</span></li>
+      {% endfor %}
+    </ol>
+  </div>
+</section>
+
+<!-- INTRODUCE PRODUCT -->
+<section class="section section--navy" id="how-it-works" data-track-view="product_section_viewed" aria-labelledby="product-title">
+  <div class="container">
+    <div class="section-head section-head--light">
+      <p class="eyebrow">Introducing Veridyn Recruit</p>
+      <h2 id="product-title">The Checklist Shows You What to Check.<br><span class="t-green">Veridyn Recruit Helps You Manage the Process.</span></h2>
+      <p>Veridyn Recruit is being built to help care providers manage recruitment from initial application through to final approval within one structured digital workflow.</p>
+    </div>
+    <div class="pipeline-wrap">
+      <ol class="pipeline" aria-label="Recruitment pipeline stages">
+        {% for s in ['Application','Documents','Employment History','References','DBS','Right to Work','Safeguarding','Review','Approved'] %}
+        <li class="pipeline__step {{ 'is-done' if loop.index <= 3 or loop.index == 6 else ('is-current' if loop.index in [4,5] else '') }}"><span class="pipeline__dot" aria-hidden="true">{{ '✓' if loop.index <= 3 or loop.index == 6 else loop.index }}</span><span class="pipeline__label">{{ s }}</span></li>
+        {% endfor %}
+      </ol>
+      <div class="candidate-card" role="group" aria-label="Example candidate progress: Amina Hassan, 72% complete">
+        <div class="candidate-card__head">
+          <span class="avatar avatar--lg">AH</span>
+          <div><strong>Amina Hassan</strong><span>Care Assistant · Domiciliary Care</span></div>
+          <span class="pill pill--amber">Action required</span>
+        </div>
+        <ul class="progress-items">
+          <li><span>Application</span><span class="st st--ok">✓ Complete</span></li>
+          <li><span>Employment History</span><span class="st st--ok">✓ Complete</span></li>
+          <li><span>References</span><span class="st st--warn">1 of 2 received</span></li>
+          <li><span>DBS</span><span class="st st--warn">In Progress</span></li>
+          <li><span>Right to Work</span><span class="st st--ok">✓ Verified</span></li>
+        </ul>
+        <div class="progress">
+          <div class="progress__label"><span>Overall status</span><strong>72% Complete</strong></div>
+          <div class="progress__bar" role="progressbar" aria-valuenow="72" aria-valuemin="0" aria-valuemax="100" aria-label="Overall recruitment progress"><span style="width:72%"></span></div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- BENEFITS -->
+<section class="section" id="product" aria-labelledby="benefits-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Product</p>
+      <h2 id="benefits-title">One Recruitment Journey. One Clear View.</h2>
+      <p>Built around the recruitment and compliance workflows used by UK care providers.</p>
+    </div>
+    {# Set status to 'soon' on any feature not yet available to show a "Coming Soon" tag. #}
+    {% set features = [
+      ('portal','Candidate Portal','Candidates complete applications, provide employment histories and upload required documents through their own portal.', ''),
+      ('gap','Automated Gap Detection','Help recruitment teams identify unexplained periods within candidate employment and activity histories.', ''),
+      ('doc','Document Management','Keep candidate recruitment documents organised against the appropriate applicant record.', ''),
+      ('ref','Reference Management','Request and track employment references as part of the recruitment workflow.', ''),
+      ('shield','DBS Tracking','Record and monitor DBS-related recruitment checks.', ''),
+      ('id','Right to Work','Capture and track Right to Work verification within the candidate journey.', ''),
+      ('heart','Safeguarding Assessments','Include structured safeguarding questions and assessments within recruitment.', ''),
+      ('status','Recruitment Dashboard','Give agency teams a clear overview of candidate progress and outstanding actions.', ''),
+      ('approve','Approval Workflow','Allow authorised agency users to review candidate submissions before progressing applicants.', ''),
+      ('trail','Audit Trail','Maintain a structured record of recruitment activity and decisions.', '')] %}
+    <div class="grid grid--feature">
+      {% for icon, t, d, st in features %}
+      <article class="card feature-card">
+        <span class="icon-badge icon-badge--{{ icon }}" aria-hidden="true"></span>
+        <h3>{{ t }}{% if st == 'soon' %} <span class="tag-soon">Coming Soon</span>{% endif %}</h3>
+        <p>{{ d }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- COMPARISON -->
+<section class="section section--soft" aria-labelledby="compare-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Before &amp; after</p>
+      <h2 id="compare-title">From Recruitment Admin to Recruitment Control</h2>
+    </div>
+    <div class="compare">
+      <div class="compare__col compare__col--before">
+        <h3>Without a structured platform</h3>
+        <ul>
+          {% for i in ['Candidate forms in emails','Documents in different folders','Manual employment-gap checking','References chased manually','Difficult to see outstanding requirements','Multiple spreadsheets','Unclear candidate progress'] %}
+          <li><span class="mark mark--no" aria-hidden="true">✕</span><span class="sr-only">Without: </span>{{ i }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+      <div class="compare__col compare__col--after">
+        <h3>With Veridyn Recruit</h3>
+        <ul>
+          {% for i in ['Structured candidate applications','Centralised candidate records','Employment history review','Gap identification','Reference tracking','Compliance status visibility','Clear candidate workflow','Recruitment audit trail'] %}
+          <li><span class="mark mark--yes" aria-hidden="true">✓</span><span class="sr-only">With Veridyn Recruit: </span>{{ i }}</li>
+          {% endfor %}
+        </ul>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- DASHBOARD -->
+<section class="section" aria-labelledby="dash-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">See the platform</p>
+      <h2 id="dash-title">Every Candidate, Every Check, in One Place</h2>
+      <p>A single overview of where each candidate sits — and what still needs to happen before they can be approved.</p>
+    </div>
+    {% include "_dashboard.html" %}
+  </div>
+</section>
+
+<!-- WHO IT'S FOR -->
+<section class="section section--soft" aria-labelledby="who-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Who it's for</p>
+      <h2 id="who-title">Built for Care Recruitment Teams</h2>
+    </div>
+    <div class="grid grid--4">
+      {% for icon, t, d in [
+        ('home','Domiciliary Care','Manage recruitment across growing community care teams.'),
+        ('building','Care Homes','Create a more structured recruitment process across your workforce.'),
+        ('heart','Complex Care Providers','Manage candidate information and pre-employment checks through one workflow.'),
+        ('sites','Multi-Site Care Organisations','Give recruitment and compliance teams greater visibility across candidate pipelines.')] %}
+      <article class="card audience-card">
+        <span class="icon-badge icon-badge--{{ icon }}" aria-hidden="true"></span>
+        <h3>{{ t }}</h3>
+        <p>{{ d }}</p>
+      </article>
+      {% endfor %}
+    </div>
+  </div>
+</section>
+
+<!-- SECONDARY CONVERSION -->
+<section class="section" aria-labelledby="demo-title">
+  <div class="container">
+    <div class="demo-band">
+      <div>
+        <h2 id="demo-title">Still Managing Recruitment Through Spreadsheets, Emails and Folders?</h2>
+        <p>See how Veridyn Recruit can help bring your recruitment workflow into one structured platform.</p>
+      </div>
+      <div class="demo-band__actions">
+        <a href="/demo" class="btn btn--light btn--lg" data-track="demo_cta_clicked">Request a Demo</a>
+        <a href="#get-checklist" class="text-link text-link--light js-checklist-cta">Download the Free Checklist →</a>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- FINAL CTA -->
+<section class="final-cta" aria-labelledby="final-title">
+  <div class="container final-cta__inner">
+    <svg class="final-cta__chev" viewBox="0 0 60 60" width="56" height="56" aria-hidden="true"><path d="M8 44l22-16 22 16M8 34l22-16 22 16M8 24l22-16 22 16" fill="none" stroke="#18b389" stroke-width="3"/></svg>
+    <h2 id="final-title">Build a Better Care Recruitment Process</h2>
+    <p>Download the free 2026 Care Recruitment Compliance Checklist and review your current recruitment process today.</p>
+    <a href="#get-checklist" class="btn btn--primary btn--lg js-checklist-cta">Get My Free Checklist</a>
+    <p class="micro micro--light">Free &bull; Practical &bull; Designed for UK care providers</p>
+  </div>
+</section>
+
+<div class="mobile-cta" aria-hidden="false">
+  <a href="#get-checklist" class="btn btn--primary btn--block js-checklist-cta">Get My Free Checklist</a>
+</div>
+{% endblock %}

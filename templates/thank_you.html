@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block title %}Your Checklist Is Ready | Veridyn Recruit{% endblock %}
+{% block meta %}<meta name="robots" content="noindex">{% endblock %}
+{% block content %}
+<section class="hero hero--compact" aria-labelledby="ty-title">
+  <div class="container ty">
+    <span class="ty__icon" aria-hidden="true">✓</span>
+    <p class="eyebrow">Thank you</p>
+    <h1 id="ty-title">Your Checklist Is Ready</h1>
+    <p class="hero__body">Thanks for requesting the 2026 Care Recruitment Compliance Checklist.</p>
+    {% if has_lead %}
+    <a href="/resources/care-recruitment-checklist/download" class="btn btn--primary btn--lg">Download Your Checklist</a>
+    {% else %}
+    <a href="/care-recruitment-compliance-checklist#get-checklist" class="btn btn--primary btn--lg">Get Your Free Checklist</a>
+    {% endif %}
+  </div>
+  <div class="hero__curve" aria-hidden="true"></div>
+</section>
+<section class="section" data-track-view="product_section_viewed" aria-labelledby="automate-title">
+  <div class="container">
+    <div class="section-head">
+      <p class="eyebrow">Next step</p>
+      <h2 id="automate-title">Want to automate more of this process?</h2>
+      <p>Veridyn Recruit helps care providers manage candidate recruitment and compliance workflows from application through to approval.</p>
+      <a href="/demo" class="btn btn--primary btn--lg" data-track="demo_cta_clicked">Request a Veridyn Recruit Demo</a>
+    </div>
+    {% include "_dashboard.html" %}
+  </div>
+</section>
+{% endblock %}
