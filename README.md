@@ -2,6 +2,9 @@
 
 Lead magnet landing page for the "2026 Care Recruitment Compliance Checklist".
 
+Quick start: double-click `start.bat` (Windows) or run `./start.sh` (Mac/Linux).
+
+Manual:
 ```
 pip install -r requirements.txt
 python app.py            # http://localhost:5000/care-recruitment-compliance-checklist
