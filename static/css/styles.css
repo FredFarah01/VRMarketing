@@ -376,3 +376,9 @@ a:has(> .logo) { text-decoration: none; }
   .mobile-cta.is-visible { transform: none; }
   .site-nav .btn--sm { padding: 6px 14px; min-height: 38px; font-size: .85rem; }
 }
+.btn { white-space: nowrap; }
+@media (max-width: 640px) {
+  .feature-card, .audience-card, .problem-card { display: grid; grid-template-columns: 46px 1fr; column-gap: 16px; padding: 20px; }
+  .feature-card .icon-badge, .audience-card .icon-badge, .problem-card .icon-badge { grid-row: span 2; margin: 0; }
+  .feature-card h3, .audience-card h3, .problem-card h3 { margin-bottom: 4px; }
+}
