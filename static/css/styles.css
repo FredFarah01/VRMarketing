@@ -118,7 +118,7 @@ a:has(> .logo) { text-decoration: none; }
 .check-list li { position: relative; padding-left: 26px; }
 .check-list li::before { content: "✓"; position: absolute; left: 0; color: var(--green); font-weight: 700; }
 .card { background: var(--white); border: 1px solid var(--line); border-radius: var(--radius); box-shadow: var(--shadow); }
-.form-card { padding: 32px; }
+.form-card { padding: 32px; color: var(--ink); }
 .form-section .form-card { border-top: 5px solid var(--green); }
 .form-card__title { font-size: 1.4rem; }
 .lead-form { display: grid; gap: 4px; }
