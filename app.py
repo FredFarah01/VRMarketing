@@ -11,12 +11,17 @@ from datetime import datetime, timezone
 from functools import wraps
 from pathlib import Path
 
+import psycopg
+from dotenv import load_dotenv
 from flask import (Flask, Response, abort, g, jsonify, redirect, render_template,
                    request, send_file, session, url_for)
 
 from checklist_pdf import build_checklist_pdf
 
 BASE_DIR = Path(__file__).resolve().parent
+load_dotenv(BASE_DIR / ".env")
+DATABASE_URL = os.environ.get("DATABASE_URL", "").strip()
+USE_PG = DATABASE_URL.startswith(("postgres://", "postgresql://"))
 DB_PATH = Path(os.environ.get("VERIDYN_DB", BASE_DIR / "instance" / "marketing.db"))
 PDF_PATH = BASE_DIR / "instance" / "2026-care-recruitment-compliance-checklist.pdf"
 
@@ -65,10 +70,53 @@ def now_iso() -> str:
     return datetime.now(timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
 
 
-def get_db() -> sqlite3.Connection:
+class PgRow(dict):
+    """Row supporting both column-name and positional access, like sqlite3.Row."""
+
+    def __init__(self, cols, values):
+        super().__init__(zip(cols, values))
+        self._values = values
+
+    def __getitem__(self, key):
+        return self._values[key] if isinstance(key, int) else super().__getitem__(key)
+
+
+def pg_row_factory(cursor):
+    cols = [c.name for c in cursor.description or []]
+    return lambda values: PgRow(cols, values)
+
+
+class PgConnection:
+    """Minimal sqlite3-style wrapper so the same SQL (with ? placeholders) runs on Postgres/Supabase."""
+
+    def __init__(self, url: str):
+        self.conn = psycopg.connect(url, row_factory=pg_row_factory, prepare_threshold=None, connect_timeout=10)
+
+    def execute(self, sql: str, params=()):
+        return self.conn.execute(sql.replace("?", "%s"), params)
+
+    def executescript(self, sql: str):
+        self.conn.execute(sql)
+
+    def commit(self):
+        self.conn.commit()
+
+    def close(self):
+        self.conn.close()
+
+
+def connect():
+    if USE_PG:
+        return PgConnection(DATABASE_URL)
+    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
+    conn = sqlite3.connect(DB_PATH)
+    conn.row_factory = sqlite3.Row
+    return conn
+
+
+def get_db():
     if "db" not in g:
-        g.db = sqlite3.connect(DB_PATH)
-        g.db.row_factory = sqlite3.Row
+        g.db = connect()
     return g.db
 
 
@@ -131,13 +179,21 @@ MIGRATIONS = [
     """,
 ]
 
+PG_MIGRATIONS = [
+    MIGRATIONS[0].replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY") + """
+    ALTER TABLE marketing_leads ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE marketing_events ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE marketing_demo_requests ENABLE ROW LEVEL SECURITY;
+    ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
+    """,
+]
+
 
 def migrate() -> None:
-    DB_PATH.parent.mkdir(parents=True, exist_ok=True)
-    conn = sqlite3.connect(DB_PATH)
+    conn = connect()
     conn.execute("CREATE TABLE IF NOT EXISTS schema_migrations (version INTEGER PRIMARY KEY, applied_at TEXT)")
     applied = {r[0] for r in conn.execute("SELECT version FROM schema_migrations")}
-    for version, sql in enumerate(MIGRATIONS, start=1):
+    for version, sql in enumerate(PG_MIGRATIONS if USE_PG else MIGRATIONS, start=1):
         if version not in applied:
             conn.executescript(sql)
             conn.execute("INSERT INTO schema_migrations VALUES (?, ?)", (version, now_iso()))
@@ -149,7 +205,7 @@ def is_business_email(email: str) -> bool:
     return email.rsplit("@", 1)[-1].lower() not in FREE_EMAIL_DOMAINS
 
 
-def score_lead(lead: sqlite3.Row | dict) -> tuple[int, str]:
+def score_lead(lead) -> tuple[int, str]:
     r = SCORING_RULES
     score = 0
     if lead["checklist_downloaded"]:
@@ -176,7 +232,7 @@ def score_lead(lead: sqlite3.Row | dict) -> tuple[int, str]:
     return score, temp
 
 
-def rescore(db: sqlite3.Connection, lead_id: str) -> None:
+def rescore(db, lead_id: str) -> None:
     lead = db.execute("SELECT * FROM marketing_leads WHERE lead_id = ?", (lead_id,)).fetchone()
     if lead:
         score, temp = score_lead(lead)
@@ -474,8 +530,9 @@ def filtered_leads():
     sql = "SELECT * FROM marketing_leads WHERE 1=1"
     params: list = []
     if q:
-        sql += (" AND (first_name || ' ' || last_name LIKE ? OR email LIKE ? OR organisation LIKE ? "
-                "OR IFNULL(source,'') LIKE ?)")
+        like = "ILIKE" if USE_PG else "LIKE"
+        sql += (f" AND (first_name || ' ' || last_name {like} ? OR email {like} ? OR organisation {like} ? "
+                f"OR COALESCE(source,'') {like} ?)")
         params += [f"%{q}%"] * 4
     for col, val in (("status", status), ("job_role", role), ("organisation_size", size), ("lead_temperature", temp)):
         if val:
@@ -493,7 +550,7 @@ def admin_leads():
     funnel_names = ["landing_page_view", "checklist_cta_clicked", "lead_form_started", "lead_form_submitted",
                     "checklist_downloaded", "product_section_viewed", "demo_cta_clicked", "demo_form_submitted"]
     counts = {r[0]: r[1] for r in db.execute(
-        "SELECT event_name, COUNT(DISTINCT COALESCE(visitor_id, id)) FROM marketing_events GROUP BY event_name")}
+        "SELECT event_name, COUNT(DISTINCT COALESCE(visitor_id, CAST(id AS TEXT))) FROM marketing_events GROUP BY event_name")}
     funnel = [(n, counts.get(n, 0)) for n in funnel_names]
     total = db.execute("SELECT COUNT(*) FROM marketing_leads").fetchone()[0]
     return render_template("admin_leads.html", leads=leads, filters=filters, statuses=LEAD_STATUSES,
@@ -531,6 +588,7 @@ def admin_leads_csv():
 
 
 migrate()
+print(f"Lead storage: {'Supabase/Postgres' if USE_PG else f'SQLite ({DB_PATH})'}")
 if not PDF_PATH.exists():
     build_checklist_pdf(PDF_PATH)
 
