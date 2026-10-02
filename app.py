@@ -108,6 +108,9 @@ class PgConnection:
     def executescript(self, sql: str):
         self.conn.execute(sql)
 
+    def pipeline(self):
+        return self.conn.pipeline()
+
     def commit(self):
         self.conn.commit()
 

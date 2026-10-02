@@ -89,7 +89,8 @@ def location_row(doc: dict) -> dict:
         "ccg_code": doc.get("onspdCcgCode") or doc.get("odsCcgCode"),
         "ccg_name": doc.get("onspdCcgName") or doc.get("odsCcgName"),
         "location_types": piped(t.get("type") for t in doc.get("locationTypes") or []),
-        "service_types": piped(s.get("name") for s in doc.get("gacServiceTypes") or []),
+        "service_types": piped(v for s in doc.get("gacServiceTypes") or []
+                               for v in (s.get("name"), s.get("description")) if v),
         "specialisms": piped(s.get("name") for s in doc.get("specialisms") or []),
     })
     return row

@@ -5,8 +5,11 @@ Jobs run in a background thread, write progress to ``cqc_sync_log`` and record p
 """
 import logging
 import os
+import sqlite3
 import threading
 import time
+from concurrent.futures import ThreadPoolExecutor
+from contextlib import nullcontext
 from datetime import datetime, timedelta, timezone
 from urllib.parse import parse_qsl
 
@@ -17,7 +20,7 @@ from .rules import reclassify
 log = logging.getLogger("cqc.sync")
 
 JOB_TYPES = {
-    "full": "Full import (providers + locations)",
+    "full": "Full import (care locations + their providers)",
     "providers": "Sync providers",
     "locations": "Sync locations",
     "incremental": "Incremental refresh (changes since last sync)",
@@ -52,7 +55,16 @@ def _limit() -> int | None:
 
 
 def _location_filters() -> dict:
-    return dict(parse_qsl(os.environ.get("CQC_LOCATION_FILTERS", "")))
+    return dict(parse_qsl(os.environ.get("CQC_LOCATION_FILTERS", "inspectionDirectorate=Adult social care")))
+
+
+def _workers() -> int:
+    value = os.environ.get("CQC_SYNC_WORKERS", "").strip()
+    return max(1, min(int(value), 16)) if value.isdigit() else 8
+
+
+def _batch(db):
+    return nullcontext() if isinstance(db, sqlite3.Connection) else db.pipeline()
 
 
 class Job:
@@ -85,18 +97,29 @@ def _record_failure(db, entity: str, entity_id: str, error: str) -> None:
                (entity, entity_id, error[:500], now_iso()))
 
 
+def _fetch(client, entity: str, entity_id: str) -> dict:
+    return client.get_provider(entity_id) if entity == "provider" else client.get_location(entity_id)
+
+
+def _write_doc(db, entity: str, entity_id: str, doc: dict) -> str | None:
+    if entity == "provider":
+        pid = upsert_provider(db, doc)
+    else:
+        upsert_location(db, doc)
+        pid = doc.get("providerId")
+    db.execute("DELETE FROM cqc_sync_failures WHERE entity_type = ? AND entity_id = ?", (entity, entity_id))
+    return pid
+
+
+def _write(db, entity: str, entity_id: str, doc: dict) -> str | None:
+    with _batch(db):
+        return _write_doc(db, entity, entity_id, doc)
+
+
 def refresh_one(db, client, entity: str, entity_id: str) -> str | None:
     """Fetch and upsert one provider/location. Returns the affected provider ID."""
     try:
-        if entity == "provider":
-            doc = client.get_provider(entity_id)
-            pid = upsert_provider(db, doc)
-        else:
-            doc = client.get_location(entity_id)
-            upsert_location(db, doc)
-            pid = doc.get("providerId")
-        db.execute("DELETE FROM cqc_sync_failures WHERE entity_type = ? AND entity_id = ?", (entity, entity_id))
-        return pid
+        return _write(db, entity, entity_id, _fetch(client, entity, entity_id))
     except CQCNotFound:
         _record_failure(db, entity, entity_id, "Not found in CQC API (404)")
         raise
@@ -105,23 +128,46 @@ def refresh_one(db, client, entity: str, entity_id: str) -> str | None:
         raise
 
 
+def _fetch_safe(client, entity: str, entity_id: str):
+    try:
+        return entity_id, _fetch(client, entity, entity_id), None
+    except CQCError as exc:
+        return entity_id, None, exc
+
+
 def _process(job: Job, client, entity: str, ids, affected: set) -> None:
-    for entity_id in ids:
-        try:
-            pid = refresh_one(job.db, client, entity, entity_id)
-            affected.add(pid)
-            job.processed += 1
-        except CQCError as exc:
-            job.failed += 1
-            if exc.status in (401, 403):
+    """Fetch records concurrently from the CQC API and write them sequentially."""
+    chunk: list = []
+    with ThreadPoolExecutor(max_workers=_workers()) as pool:
+        def flush():
+            results = list(pool.map(lambda i: _fetch_safe(client, entity, i), chunk))
+            with _batch(job.db):
+                for entity_id, doc, exc in results:
+                    if exc is not None:
+                        job.failed += 1
+                        message = "Not found in CQC API (404)" if isinstance(exc, CQCNotFound) else str(exc)
+                        _record_failure(job.db, entity, entity_id, message or type(exc).__name__)
+                        continue
+                    try:
+                        affected.add(_write_doc(job.db, entity, entity_id, doc))
+                        job.processed += 1
+                    except (KeyError, ValueError) as err:
+                        job.failed += 1
+                        _record_failure(job.db, entity, entity_id, str(err) or type(err).__name__)
+            auth_error = next((e for _, _, e in results if e is not None and e.status in (401, 403)), None)
+            if auth_error is not None:
                 job.db.commit()
-                raise
-        except (KeyError, ValueError):
-            job.failed += 1
-        if (job.processed + job.failed) % 50 == 0:
+                raise auth_error
             job.db.commit()
             job.progress(f"{entity}: {job.processed} synced, {job.failed} failed")
-    job.db.commit()
+            chunk.clear()
+
+        for entity_id in ids:
+            chunk.append(entity_id)
+            if len(chunk) >= 100:
+                flush()
+        if chunk:
+            flush()
 
 
 def _last_success_end(db) -> str | None:
@@ -150,13 +196,15 @@ def run_job(job_type: str, entity_id: str | None = None) -> dict:
             if not client.configured:
                 raise CQCError("CQC_API_KEY is not configured")
             limit = _limit()
-            if job_type in ("full", "providers"):
-                ids = (p["providerId"] for p in client.iter_ids("providers", "providerId", limit))
-                _process(job, client, "provider", ids, affected)
             if job_type in ("full", "locations"):
                 ids = (l["locationId"] for l in client.iter_ids("locations", "locationId", limit,
                                                                   **_location_filters()))
                 _process(job, client, "location", ids, affected)
+            if job_type == "full":
+                _process(job, client, "provider", sorted(p for p in affected if p), affected)
+            if job_type == "providers":
+                ids = (p["providerId"] for p in client.iter_ids("providers", "providerId", limit))
+                _process(job, client, "provider", ids, affected)
             if job_type == "incremental":
                 for entity in ("provider", "location"):
                     _process(job, client, entity, client.iter_changes(entity, window_start, window_end), affected)
