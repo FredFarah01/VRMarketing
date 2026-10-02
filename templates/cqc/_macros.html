@@ -13,3 +13,7 @@
 {% macro dd(label, value) -%}
 <div><dt>{{ label }}</dt><dd>{{ value if value not in (None, '') else '—' }}</dd></div>
 {%- endmacro %}
+
+{% macro reg_managers(entries, with_location=True) -%}
+{% if entries %}{% for e in entries[:2] %}<span class="rm">{{ e.name }}</span>{% if with_location %}<br><small><a href="/admin/cqc/locations/{{ e.location_id }}">{{ e.location_name }}</a></small>{% endif %}{% if not loop.last %}<br>{% endif %}{% endfor %}{% if entries|length > 2 %}<br><small class="muted">+{{ entries|length - 2 }} more</small>{% endif %}{% else %}<span class="muted">Not listed</span>{% endif %}
+{%- endmacro %}

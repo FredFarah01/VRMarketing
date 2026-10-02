@@ -34,6 +34,7 @@
     <h2>Inspection categories</h2><p>{{ (loc.inspection_categories|pipes)|join(', ') or '—' }}</p>
     <h2>Details</h2>
     <dl class="dl">
+      {{ dd('Registered manager', managers|join(', ') or 'Not listed by CQC') }}
       {{ dd('Address', [loc.address_line_1, loc.address_line_2, loc.town_city, loc.county, loc.postal_code]|select|join(', ')) }}
       {{ dd('Region', loc.region) }}{{ dd('Local authority', loc.local_authority) }}{{ dd('ICB', loc.icb_name) }}{{ dd('Constituency', loc.constituency) }}
       {{ dd('Registration date', loc.registration_date) }}{{ dd('Deregistration date', loc.deregistration_date) }}{{ dd('Dormancy', loc.dormancy) }}

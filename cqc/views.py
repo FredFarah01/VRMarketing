@@ -281,13 +281,48 @@ def _contacts_by_provider(provider_ids):
     return out
 
 
+def _manager_names(contacts_json) -> list[str]:
+    try:
+        people = json.loads(contacts_json or "[]")
+    except ValueError:
+        return []
+    return [" ".join(v for v in (c.get("personTitle"), c.get("personGivenName"), c.get("personFamilyName")) if v)
+            for c in people if isinstance(c, dict) and "Registered Manager" in (c.get("personRoles") or [])]
+
+
+def _registered_managers(key: str, ids) -> dict:
+    """Registered managers named by CQC on active locations, keyed by location_id or provider_id."""
+    out: dict = {}
+    ids = [i for i in dict.fromkeys(ids) if i]
+    for i in range(0, len(ids), 500):
+        chunk = ids[i:i + 500]
+        q = ("SELECT l.provider_id, l.location_id, l.name, ra.contacts_json FROM cqc_locations l "
+             "JOIN cqc_regulated_activities ra ON ra.entity_type = 'location' AND ra.entity_id = l.location_id "
+             f"WHERE l.{key} IN ({', '.join('?' for _ in chunk)}) AND l.registration_status = 'Registered' "
+             "AND ra.contacts_json LIKE ? ORDER BY l.name")
+        for r in db().execute(q, [*chunk, "%Registered Manager%"]):
+            found = out.setdefault(r[key], [])
+            for name in _manager_names(r["contacts_json"]):
+                entry = {"name": name, "location_id": r["location_id"], "location_name": r["name"]}
+                if entry not in found:
+                    found.append(entry)
+    return out
+
+
+def _managers_text(entries, with_location: bool) -> str:
+    return "; ".join(f"{e['name']} ({e['location_name']})" if with_location else e["name"] for e in entries)
+
+
 def _export(rows, columns, filename, fmt):
     contacts = _contacts_by_provider({r["provider_id"] for r in rows if r["provider_id"]})
-    header = [c[0] for c in columns] + [c[0] for c in CONTACT_EXPORT]
+    key = "location_id" if columns is LOCATION_EXPORT else "provider_id"
+    managers = _registered_managers(key, [r[key] for r in rows])
+    header = [c[0] for c in columns] + ["Registered Manager(s)"] + [c[0] for c in CONTACT_EXPORT]
     data = []
     for r in rows:
         contact = contacts.get(r["provider_id"])
         data.append([_cell(r[k], k) for _, k in columns] +
+                    [_managers_text(managers.get(r[key], []), key == "provider_id")] +
                     [(contact[k] or "") if contact else "" for _, k in CONTACT_EXPORT])
     stamp = f"{datetime.now():%Y%m%d-%H%M}"
     if fmt == "xlsx":
@@ -379,7 +414,8 @@ def provider_profile(provider_id):
     return render_template("cqc/provider.html", p=p, cls=cls, locations=locations, unsynced=unsynced,
                            activities_cqc=acts, rels=rels, reports=reports, ratings=_ratings("provider", provider_id),
                            dupes=dupes, acc=acc, contacts=contacts, notes=notes, activities=activities, lists=lists,
-                           raw=raw, loc_status=status, enrich_fields=ENRICH_FIELDS, decision_roles=DECISION_ROLES,
+                           raw=raw, loc_status=status, managers=_registered_managers("location_id", synced_ids),
+                           enrich_fields=ENRICH_FIELDS, decision_roles=DECISION_ROLES,
                            confidence=CONFIDENCE)
 
 
@@ -410,7 +446,8 @@ def location_profile(location_id):
     raw = json.loads(loc["raw_json"] or "{}")
     return render_template("cqc/location.html", loc=loc, provider=provider, cls=cls, pcls=pcls, services=services,
                            activities_cqc=acts, rels=rels, reports=reports, siblings=siblings,
-                           ratings=_ratings("location", location_id), acc=acc, raw=raw)
+                           ratings=_ratings("location", location_id), acc=acc, raw=raw,
+                           managers=list(dict.fromkeys(n for a in acts for n in _manager_names(a["contacts_json"]))))
 
 
 @bp.post("/admin/cqc/<entity>/<entity_id>/refresh")
@@ -567,7 +604,8 @@ def leads():
         params.append(owner)
     rows = db().execute(sql + " ORDER BY a.updated_at DESC LIMIT 500", params).fetchall()
     counts = {r[0]: r[1] for r in db().execute("SELECT status, COUNT(*) FROM lead_accounts GROUP BY status")}
-    return render_template("cqc/leads.html", rows=rows, counts=counts, status=status, owner=owner)
+    return render_template("cqc/leads.html", rows=rows, counts=counts, status=status, owner=owner,
+                           managers=_registered_managers("provider_id", [r["provider_id"] for r in rows]))
 
 
 # ---------- Lead lists ----------
@@ -624,7 +662,9 @@ def list_detail(list_id):
     lst = db().execute("SELECT * FROM lead_lists WHERE list_id = ?", (_id(list_id),)).fetchone()
     if not lst:
         abort(404)
-    return render_template("cqc/list_detail.html", lst=lst, rows=_list_rows(list_id))
+    rows = _list_rows(list_id)
+    return render_template("cqc/list_detail.html", lst=lst, rows=rows,
+                           managers=_registered_managers("provider_id", [r["provider_id"] for r in rows]))
 
 
 @bp.get("/admin/cqc/lists/<list_id>/export.<fmt>")
