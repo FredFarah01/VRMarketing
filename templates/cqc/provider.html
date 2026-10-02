@@ -1,5 +1,5 @@
 {% extends "cqc/_layout.html" %}
-{% from "cqc/_macros.html" import rating, status, segs, source, dd, reg_managers %}
+{% from "cqc/_macros.html" import rating, status, segs, source, dd, reg_managers, phone %}
 {% block title %}{{ p.name }} | CQC Provider | Veridyn Recruit{% endblock %}
 {% block admin %}
 <a class="text-link" href="/admin/cqc/search">‹ Back to search</a>
@@ -71,16 +71,17 @@
   <div class="panel-head"><h2>Locations ({{ locations|length + unsynced|length }})</h2>
     <div class="seg-toggle seg-toggle--links">{% for v, l in [('all','All'),('active','Active'),('inactive','Inactive')] %}<a class="{{ 'is-active' if loc_status == v }}" href="?loc_status={{ v }}">{{ l }}</a>{% endfor %}</div></div>
   <div class="table-scroll"><table class="admin-table cqc-table cqc-table--compact">
-    <thead><tr><th>Location</th><th>Registered Manager</th><th>Segment</th><th>Service types</th><th>Beds</th><th>Rating</th><th>Registered</th><th>Town / postcode</th><th>Status</th></tr></thead>
+    <thead><tr><th>Location</th><th>Registered Manager</th><th>Telephone</th><th>Segment</th><th>Service types</th><th>Beds</th><th>Rating</th><th>Registered</th><th>Town / postcode</th><th>Status</th></tr></thead>
     <tbody>
     {% for l in locations %}<tr>
       <td><a class="row-title" href="/admin/cqc/locations/{{ l.location_id }}">{{ l.name }}</a><br><small>{{ l.location_id }}</small></td>
       <td>{{ reg_managers(managers.get(l.location_id, []), False) }}</td>
+      <td>{{ phone(l.main_phone_number) }}</td>
       <td>{{ segs(l.segments) }}</td><td><small>{{ (l.service_types|pipes)|join(', ') }}</small></td><td>{{ l.number_of_beds or '—' }}</td>
       <td>{{ rating(l.current_rating) }}</td><td>{{ l.registration_date or '—' }}</td><td>{{ l.town_city or '' }}<br><small>{{ l.postal_code or '' }}</small></td><td>{{ status(l.registration_status) }}</td></tr>
     {% endfor %}
-    {% for lid in unsynced %}<tr><td>{{ lid }}</td><td colspan="8" class="muted">Linked by CQC, not yet synchronised. Run a location sync to load details.</td></tr>{% endfor %}
-    {% if not locations and not unsynced %}<tr><td colspan="9" class="empty">No locations in this view.</td></tr>{% endif %}
+    {% for lid in unsynced %}<tr><td>{{ lid }}</td><td colspan="9" class="muted">Linked by CQC, not yet synchronised. Run a location sync to load details.</td></tr>{% endfor %}
+    {% if not locations and not unsynced %}<tr><td colspan="10" class="empty">No locations in this view.</td></tr>{% endif %}
     </tbody></table></div>
 </div>
 

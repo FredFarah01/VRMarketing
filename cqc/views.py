@@ -592,7 +592,7 @@ def delete_contact(contact_id):
 def leads():
     status = request.args.get("status", "")
     owner = deps["clean"](request.args.get("owner"), 80)
-    sql = ("SELECT a.*, p.name, p.town_city, p.region, p.registration_status, c.primary_segment, c.location_count, "
+    sql = ("SELECT a.*, p.name, p.town_city, p.region, p.registration_status, p.main_phone_number, c.primary_segment, c.location_count, "
            "c.size_tier, c.lead_score FROM lead_accounts a LEFT JOIN cqc_providers p ON p.provider_id = a.provider_id "
            "LEFT JOIN cqc_classifications c ON c.entity_type = 'provider' AND c.entity_id = a.provider_id WHERE 1=1")
     params = []
