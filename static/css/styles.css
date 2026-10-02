@@ -105,6 +105,23 @@ a:has(> .logo) { text-decoration: none; }
 .tick-dot { width: 22px; height: 22px; border-radius: 50%; background: var(--green); color: #fff; display: grid; place-items: center; font-size: .72rem; }
 .tick-dot--amber { background: var(--amber); }
 @keyframes float { 0%,100% { transform: translateY(0); } 50% { transform: translateY(-6px); } }
+.doc-stack { perspective: 1200px; cursor: pointer; }
+.doc, .float-badge, .doc__chevrons, .doc__year { transition: transform .6s cubic-bezier(.2,.8,.2,1), translate .6s cubic-bezier(.2,.8,.2,1), box-shadow .6s ease; }
+.doc--front::before { content: ""; position: absolute; inset: 0; background: linear-gradient(115deg, transparent 35%, rgba(255,255,255,.14) 50%, transparent 65%); transform: translateX(-120%); transition: transform .9s ease; pointer-events: none; }
+.doc-stack:hover .doc--front { transform: translateY(-14px) rotateY(-8deg) rotateX(4deg); box-shadow: 0 40px 80px -20px rgba(5,12,35,.75); }
+.doc-stack:hover .doc--front::before { transform: translateX(120%); }
+.doc-stack:hover .doc--mid { transform: rotate(7deg) translate(18px, 4px); }
+.doc-stack:hover .doc--back { transform: rotate(13deg) translate(30px, 10px); }
+.doc-stack:hover .doc__year { transform: scale(1.06); transform-origin: left center; }
+.doc-stack:hover .doc__chevrons { transform: translateY(-6px); }
+.doc-stack:hover .float-badge--a { translate: 18px -10px; }
+.doc-stack:hover .float-badge--b { translate: -18px 10px; }
+.doc-stack:hover .doc__list li::before { display: inline-block; animation: tick-pop .5s ease both; }
+.doc-stack:hover .doc__list li:nth-child(2)::before { animation-delay: .08s; }
+.doc-stack:hover .doc__list li:nth-child(3)::before { animation-delay: .16s; }
+.doc-stack:hover .doc__list li:nth-child(4)::before { animation-delay: .24s; }
+.doc-stack:hover .doc__list li:nth-child(5)::before { animation-delay: .32s; }
+@keyframes tick-pop { 0% { transform: scale(0); } 70% { transform: scale(1.4); } 100% { transform: scale(1); } }
 
 /* Form section */
 .form-section { padding: 40px 0 96px; scroll-margin-top: 72px; }
