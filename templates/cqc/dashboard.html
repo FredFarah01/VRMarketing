@@ -1,0 +1,27 @@
+{% extends "cqc/_layout.html" %}
+{% block title %}CQC Market Intelligence | Veridyn Recruit{% endblock %}
+{% block admin %}
+<div class="admin__head">
+  <div><p class="eyebrow">CQC Market Intelligence</p><h1>Care Market Dashboard</h1>
+    <p>{% if last_sync %}CQC data last synchronised {{ last_sync.finished_at[:16]|replace('T', ' ') }} UTC{% else %}No CQC sync has run yet{% endif %}{% if sample %} · <strong>includes {{ sample }} fictional sample providers</strong>{% endif %}</p></div>
+  <a class="btn btn--primary btn--sm" href="/admin/cqc/search">Search providers</a>
+</div>
+{% if not total %}
+<div class="card empty-state"><h2>No CQC data yet</h2><p>Connect the CQC Syndication API and run the initial import{% if staff_role == 'admin' %} in <a href="/admin/settings/integrations/cqc">Settings › Integrations › CQC</a>{% endif %}. You can also load fictional sample data to try the tools.</p></div>
+{% endif %}
+<div class="kpis">
+  {% for label, value, href in kpis %}<a class="kpi" href="{{ href }}"><span>{{ label }}</span><strong>{{ '{:,}'.format(value) }}</strong></a>{% endfor %}
+</div>
+<div class="charts">
+  {% for title, data in charts %}
+  <div class="card chart">
+    <h3>{{ title }}</h3>
+    {% set top = (data|map(attribute=1)|max) if data else 0 %}
+    {% for label, n in data %}
+      <div class="bar"><span class="bar__label" title="{{ label }}">{{ label }}</span><span class="bar__track"><span class="bar__fill" style="width: {{ (100 * n / top) if top else 0 }}%"></span></span><span class="bar__n">{{ '{:,}'.format(n) }}</span></div>
+    {% else %}<p class="muted">No data yet.</p>{% endfor %}
+  </div>
+  {% endfor %}
+</div>
+<p class="small-note">Segments, location-count tiers, signals and the Veridyn Lead Score are Veridyn's own sales classifications derived from CQC registration data. They are not CQC ratings or official CQC assessments.</p>
+{% endblock %}

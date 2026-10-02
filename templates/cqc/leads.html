@@ -1,0 +1,22 @@
+{% extends "cqc/_layout.html" %}
+{% from "cqc/_macros.html" import status %}
+{% block title %}Sales Leads | Veridyn Recruit{% endblock %}
+{% block admin %}
+<div class="admin__head"><div><p class="eyebrow">Veridyn CRM</p><h1>Provider Leads</h1><p>{{ rows|length }} leads shown</p></div></div>
+<div class="tabs">
+  <a class="{{ 'is-active' if not status }}" href="/admin/cqc/leads">All ({{ counts.values()|sum }})</a>
+  {% for s in lead_statuses %}<a class="{{ 'is-active' if status == s }}" href="?status={{ s|urlencode }}">{{ s }} ({{ counts.get(s, 0) }})</a>{% endfor %}
+</div>
+<div class="table-scroll card"><table class="admin-table cqc-table">
+  <thead><tr><th>Provider</th><th>Segment</th><th>Locations</th><th>Region</th><th>Veridyn Lead Score</th><th>Owner</th><th>Status</th><th>Updated</th></tr></thead>
+  <tbody>
+  {% for r in rows %}<tr>
+    <td><a class="row-title" href="/admin/cqc/providers/{{ r.provider_id }}">{{ r.name or r.provider_id }}</a><br>{{ status(r.registration_status) }}</td>
+    <td>{{ r.primary_segment or '—' }}</td><td>{{ r.location_count or 0 }}<br><small>{{ r.size_tier or '' }}</small></td>
+    <td>{{ r.town_city or '' }}<br><small>{{ r.region or '' }}</small></td><td><span class="score">{{ r.lead_score or 0 }}</span></td>
+    <td>{{ r.sales_owner or '—' }}</td>
+    <td><form method="post" action="/admin/cqc/leads/{{ r.account_id }}/update" class="status-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="sales_owner" value="{{ r.sales_owner or '' }}"><input type="hidden" name="tags" value="{{ r.tags or '' }}"><label class="sr-only" for="s-{{ r.account_id }}">Status</label><select id="s-{{ r.account_id }}" name="status" onchange="this.form.submit()">{% for s in lead_statuses %}<option {{ 'selected' if r.status == s }}>{{ s }}</option>{% endfor %}</select></form></td>
+    <td><small>{{ (r.updated_at or '')[:10] }}</small></td></tr>
+  {% else %}<tr><td colspan="8" class="empty">No leads yet. Use “Add to leads” on the search page or a provider profile.</td></tr>{% endfor %}
+  </tbody></table></div>
+{% endblock %}

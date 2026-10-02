@@ -1,5 +1,6 @@
 import csv
 import io
+import logging
 import os
 import re
 import secrets
@@ -17,6 +18,8 @@ from flask import (Flask, Response, abort, g, jsonify, redirect, render_template
                    request, send_file, session, url_for)
 
 from checklist_pdf import build_checklist_pdf
+from cqc import views as cqc_views
+from cqc.schema import CQC_SCHEMA_SQL, PG_RLS_SQL
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
@@ -62,6 +65,9 @@ app.config["SESSION_COOKIE_HTTPONLY"] = True
 app.config["SESSION_COOKIE_SAMESITE"] = "Lax"
 ADMIN_USER = os.environ.get("ADMIN_USER", "admin")
 ADMIN_PASSWORD = os.environ.get("ADMIN_PASSWORD", "veridyn-admin")
+SALES_USER = os.environ.get("SALES_USER", "sales")
+SALES_PASSWORD = os.environ.get("SALES_PASSWORD", "")
+logging.basicConfig(level=logging.INFO, format="%(asctime)s %(name)s %(levelname)s %(message)s")
 
 _rate_buckets: dict[str, deque] = defaultdict(deque)
 
@@ -94,6 +100,10 @@ class PgConnection:
 
     def execute(self, sql: str, params=()):
         return self.conn.execute(sql.replace("?", "%s"), params)
+
+    def executemany(self, sql: str, rows):
+        with self.conn.cursor() as cur:
+            cur.executemany(sql.replace("?", "%s"), rows)
 
     def executescript(self, sql: str):
         self.conn.execute(sql)
@@ -177,6 +187,7 @@ MIGRATIONS = [
         created_at TEXT NOT NULL
     );
     """,
+    CQC_SCHEMA_SQL,
 ]
 
 PG_MIGRATIONS = [
@@ -186,6 +197,7 @@ PG_MIGRATIONS = [
     ALTER TABLE marketing_demo_requests ENABLE ROW LEVEL SECURITY;
     ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
     """,
+    CQC_SCHEMA_SQL.replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY") + PG_RLS_SQL,
 ]
 
 
@@ -508,8 +520,17 @@ def admin_login():
         elif (secrets.compare_digest(request.form.get("username", ""), ADMIN_USER)
               and secrets.compare_digest(request.form.get("password", ""), ADMIN_PASSWORD)):
             session["is_admin"] = True
+            session["role"] = "admin"
+            session["username"] = ADMIN_USER
             nxt = request.args.get("next", "")
             return redirect(nxt if nxt.startswith("/admin") else url_for("admin_leads"))
+        elif (SALES_PASSWORD and secrets.compare_digest(request.form.get("username", ""), SALES_USER)
+              and secrets.compare_digest(request.form.get("password", ""), SALES_PASSWORD)):
+            session.pop("is_admin", None)
+            session["role"] = "sales"
+            session["username"] = SALES_USER
+            nxt = request.args.get("next", "")
+            return redirect(nxt if nxt.startswith("/admin/cqc") else url_for("cqc.dashboard"))
         else:
             error = "Incorrect username or password."
     return render_template("admin_login.html", error=error)
@@ -517,7 +538,8 @@ def admin_login():
 
 @app.post("/admin/logout")
 def admin_logout():
-    session.pop("is_admin", None)
+    for key in ("is_admin", "role", "username"):
+        session.pop(key, None)
     return redirect(url_for("admin_login"))
 
 
@@ -588,6 +610,8 @@ def admin_leads_csv():
 
 
 migrate()
+cqc_views.init(app, get_db=get_db, connect=connect, check_csrf=check_csrf, clean=clean,
+               rate_limited=rate_limited, client_ip=client_ip, use_pg=USE_PG)
 print(f"Lead storage: {'Supabase/Postgres' if USE_PG else f'SQLite ({DB_PATH})'}")
 if not PDF_PATH.exists():
     build_checklist_pdf(PDF_PATH)

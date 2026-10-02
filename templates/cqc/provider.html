@@ -1,0 +1,146 @@
+{% extends "cqc/_layout.html" %}
+{% from "cqc/_macros.html" import rating, status, segs, source, dd %}
+{% block title %}{{ p.name }} | CQC Provider | Veridyn Recruit{% endblock %}
+{% block admin %}
+<a class="text-link" href="/admin/cqc/search">‹ Back to search</a>
+<div class="profile-head card">
+  <div>
+    <p class="eyebrow">CQC Provider</p>
+    <h1>{{ p.name }}</h1>
+    <p class="profile-meta">{{ status(p.registration_status) }} {{ source(p.source) }} <span>CQC Provider ID <strong>{{ p.provider_id }}</strong></span>{% if p.companies_house_number %}<span>Companies House <strong>{{ p.companies_house_number }}</strong></span>{% endif %}</p>
+    <div class="profile-segs">{{ segs(cls.segments if cls else '') }}</div>
+  </div>
+  <div class="profile-stats">
+    <div><span>Locations</span><strong>{{ cls.location_count if cls else 0 }}</strong><small>{{ cls.size_tier or '' }}</small></div>
+    <div><span>CQC Rating</span>{{ rating(p.current_rating) }}</div>
+    <div><span>Veridyn Lead Score</span><strong>{{ cls.lead_score if cls else 0 }}</strong><small>Internal score, not a CQC assessment</small></div>
+  </div>
+  <div class="profile-actions">
+    {% if p.website %}<a class="btn btn--ghost-dark btn--sm" href="{{ p.website if p.website.startswith('http') else 'https://' ~ p.website }}" target="_blank" rel="noopener noreferrer">Website</a>{% endif %}
+    {% if p.main_phone_number %}<a class="btn btn--ghost-dark btn--sm" href="tel:{{ p.main_phone_number }}">{{ p.main_phone_number }}</a>{% endif %}
+    {% if not acc %}
+    <form method="post" action="/admin/cqc/providers/{{ p.provider_id }}/lead"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn--primary btn--sm">Add to leads</button></form>
+    {% else %}<span class="pill pill--green">Lead · {{ acc.status }}</span>{% endif %}
+  </div>
+</div>
+
+{% if dupes %}<div class="flash flash--error">Possible duplicate organisation: Companies House number {{ p.companies_house_number }} is also used by {% for d in dupes %}<a href="/admin/cqc/providers/{{ d.provider_id }}">{{ d.name }} ({{ d.provider_id }})</a>{{ ', ' if not loop.last }}{% endfor %}. Flagged for review; records are not merged automatically.</div>{% endif %}
+
+{% set signals = cls.signals|fromjson if cls else [] %}
+{% if signals %}<div class="signals">{% for s in signals %}<span class="signal">{{ s }}</span>{% endfor %}</div>{% endif %}
+
+<div class="profile-grid">
+  <div class="card panel">
+    <h2>Overview</h2>
+    <dl class="dl">
+      {{ dd('Organisation type', p.organisation_type) }}{{ dd('Ownership type', p.ownership_type) }}{{ dd('Provider type', p.type) }}
+      {{ dd('Also known as', p.also_known_as) }}{{ dd('Brand', p.brand_name) }}{{ dd('Charity number', p.charity_number) }}
+      {{ dd('Address', [p.address_line_1, p.address_line_2, p.town_city, p.county, p.postal_code]|select|join(', ')) }}
+      {{ dd('Region', p.region) }}{{ dd('Local authority', p.local_authority) }}{{ dd('ICB', p.icb_name) }}{{ dd('Constituency', p.constituency) }}
+      {{ dd('Inspection directorate', p.inspection_directorate) }}{{ dd('ODS code', p.ods_code) }}{{ dd('UPRN', p.uprn) }}
+    </dl>
+    <h2>Registration</h2>
+    <dl class="dl">
+      {{ dd('Registration status', p.registration_status) }}{{ dd('Registration date', p.registration_date) }}{{ dd('Deregistration date', p.deregistration_date) }}
+      {{ dd('Last inspection', p.last_inspection_date) }}{{ dd('Last report published', p.last_report_date) }}
+    </dl>
+    <h2>Regulated activities</h2>
+    {% for a in activities_cqc %}<p class="li">{{ a.name }} <small>({{ a.code }})</small>{% set c = a.contacts_json|fromjson %}{% for person in c %}<br><small>Nominated individual: {{ [person.personTitle, person.personGivenName, person.personFamilyName]|select|join(' ') }}</small>{% endfor %}</p>{% else %}<p class="muted">None recorded.</p>{% endfor %}
+    <h2>Inspection categories</h2>
+    <p>{{ (p.inspection_categories|pipes)|join(', ') or '—' }}</p>
+    {% if p.inspection_areas %}<h2>Inspection areas</h2><p>{{ (p.inspection_areas|pipes)|join(', ') }}</p>{% endif %}
+  </div>
+
+  <div class="card panel">
+    <h2>CQC ratings</h2>
+    {% for r in ratings %}
+      <div class="rating-row"><div>{{ rating(r.overall_rating) }} {% if r.is_current %}<span class="pill pill--blue">Current</span>{% endif %}</div><small>Report {{ r.report_date or '—' }}</small>
+        {% set kq = r.key_questions_json|fromjson %}{% if kq %}<div class="kq">{% for q in kq %}<span>{{ q.name }}: <strong>{{ q.rating or '—' }}</strong></span>{% endfor %}</div>{% endif %}</div>
+    {% else %}<p class="muted">No provider-level ratings published. See individual locations below.</p>{% endfor %}
+    <h2>Reports</h2>
+    {% for r in reports %}<p class="li">{{ r.report_date }} · {{ r.report_type or 'Report' }}{% if r.report_uri %} · <a href="https://www.cqc.org.uk{{ r.report_uri }}" target="_blank" rel="noopener noreferrer">View on CQC</a>{% endif %}</p>{% else %}<p class="muted">None recorded.</p>{% endfor %}
+    <h2>Relationships</h2>
+    {% for r in rels %}<p class="li">{{ r.type }}: <a href="/admin/cqc/providers/{{ r.related_id }}">{{ r.related_name or r.related_id }}</a>{% if r.reason %} <small>({{ r.reason }})</small>{% endif %}</p>{% else %}<p class="muted">None recorded.</p>{% endfor %}
+    <h2>Data source</h2>
+    <p class="small-note">{% if p.source == 'SAMPLE' %}Fictional sample record, not CQC data.{% else %}Care Quality Commission Syndication API{% endif %} · first stored {{ (p.first_seen_at or '')[:10] }} · last synchronised {{ (p.cqc_synced_at or '')[:16]|replace('T', ' ') }} UTC</p>
+    {% if p.source != 'SAMPLE' %}<form method="post" action="/admin/cqc/providers/{{ p.provider_id }}/refresh"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn--ghost-dark btn--sm">Refresh from CQC</button></form>{% endif %}
+  </div>
+</div>
+
+<div class="card panel">
+  <div class="panel-head"><h2>Locations ({{ locations|length + unsynced|length }})</h2>
+    <div class="seg-toggle seg-toggle--links">{% for v, l in [('all','All'),('active','Active'),('inactive','Inactive')] %}<a class="{{ 'is-active' if loc_status == v }}" href="?loc_status={{ v }}">{{ l }}</a>{% endfor %}</div></div>
+  <div class="table-scroll"><table class="admin-table cqc-table cqc-table--compact">
+    <thead><tr><th>Location</th><th>Segment</th><th>Service types</th><th>Beds</th><th>Rating</th><th>Registered</th><th>Town / postcode</th><th>Status</th></tr></thead>
+    <tbody>
+    {% for l in locations %}<tr>
+      <td><a class="row-title" href="/admin/cqc/locations/{{ l.location_id }}">{{ l.name }}</a><br><small>{{ l.location_id }}</small></td>
+      <td>{{ segs(l.segments) }}</td><td><small>{{ (l.service_types|pipes)|join(', ') }}</small></td><td>{{ l.number_of_beds or '—' }}</td>
+      <td>{{ rating(l.current_rating) }}</td><td>{{ l.registration_date or '—' }}</td><td>{{ l.town_city or '' }}<br><small>{{ l.postal_code or '' }}</small></td><td>{{ status(l.registration_status) }}</td></tr>
+    {% endfor %}
+    {% for lid in unsynced %}<tr><td>{{ lid }}</td><td colspan="7" class="muted">Linked by CQC, not yet synchronised. Run a location sync to load details.</td></tr>{% endfor %}
+    {% if not locations and not unsynced %}<tr><td colspan="8" class="empty">No locations in this view.</td></tr>{% endif %}
+    </tbody></table></div>
+</div>
+
+<div class="card panel" id="crm">
+  <h2>Sales &amp; CRM <small class="muted">Veridyn data, kept separate from CQC records</small></h2>
+  {% if not acc %}
+    <p>This provider is not a lead yet.</p>
+    <form method="post" action="/admin/cqc/providers/{{ p.provider_id }}/lead"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn--primary btn--sm">Add to leads</button></form>
+  {% else %}
+  <form method="post" action="/admin/cqc/leads/{{ acc.account_id }}/update" class="crm-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <label>Lead status<select name="status">{% for s in lead_statuses %}<option {{ 'selected' if acc.status == s }}>{{ s }}</option>{% endfor %}</select></label>
+    <label>Sales owner<input name="sales_owner" value="{{ acc.sales_owner or '' }}" maxlength="80"></label>
+    <label>Tags<input name="tags" value="{{ acc.tags or '' }}" maxlength="200" placeholder="comma separated"></label>
+    <button class="btn btn--primary btn--sm">Save</button>
+  </form>
+  <div class="profile-grid">
+    <div>
+      <h3>Contacts &amp; enrichment</h3>
+      {% for c in contacts %}
+        <div class="contact">
+          <strong>{{ c.decision_maker or 'Organisation contact' }}</strong>{% if c.decision_maker_role %} · {{ c.decision_maker_role }}{% endif %}
+          <dl class="dl dl--tight">
+            {% for k in enrich_fields if c[k] and k not in ('decision_maker', 'decision_maker_role') %}<div><dt>{{ k|replace('_', ' ')|capitalize }}</dt><dd>{% if 'email' in k %}<a href="mailto:{{ c[k] }}">{{ c[k] }}</a>{% elif 'linkedin' in k or k == 'organisation_website' %}<a href="{{ c[k] if c[k].startswith('http') else 'https://' ~ c[k] }}" target="_blank" rel="noopener noreferrer">{{ c[k] }}</a>{% else %}{{ c[k] }}{% endif %}</dd></div>{% endfor %}
+          </dl>
+          <form method="post" action="/admin/cqc/contacts/{{ c.contact_id }}/delete"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-link btn-link">Remove</button></form>
+        </div>
+      {% else %}<p class="muted">No contacts yet. Suggested roles to research: {{ decision_roles|join(', ') }}.</p>{% endfor %}
+      <details class="adv"><summary>Add contact / enrichment</summary>
+        <form method="post" action="/admin/cqc/leads/{{ acc.account_id }}/contacts" class="adv__grid">
+          <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+          <label>Organisation website<input name="organisation_website" value="{{ p.website or '' }}"></label>
+          <label>General email<input type="email" name="general_email"></label>
+          <label>Recruitment email<input type="email" name="recruitment_email"></label>
+          <label>Telephone<input name="telephone" value="{{ p.main_phone_number or '' }}"></label>
+          <label>Decision maker<input name="decision_maker"></label>
+          <label>Decision maker role<input name="decision_maker_role" list="roles"><datalist id="roles">{% for r in decision_roles %}<option>{{ r }}</option>{% endfor %}</datalist></label>
+          <label>Decision maker email<input type="email" name="decision_maker_email"></label>
+          <label>LinkedIn URL<input name="linkedin_url"></label>
+          <label>Company LinkedIn<input name="company_linkedin"></label>
+          <label>Source<input name="source" placeholder="e.g. company website"></label>
+          <label>Last verified<input type="date" name="last_verified"></label>
+          <label>Confidence<select name="confidence"><option value="">—</option>{% for c in confidence %}<option>{{ c }}</option>{% endfor %}</select></label>
+          <div><button class="btn btn--primary btn--sm">Save contact</button></div>
+        </form>
+      </details>
+    </div>
+    <div>
+      <h3>Notes</h3>
+      <form method="post" action="/admin/cqc/leads/{{ acc.account_id }}/notes" class="note-form"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="sr-only" for="note">Note</label><textarea id="note" name="body" rows="3" maxlength="4000" placeholder="Add a note"></textarea><button class="btn btn--primary btn--sm">Add note</button></form>
+      {% for n in notes %}<div class="note"><small>{{ n.created_at[:16]|replace('T', ' ') }} · {{ n.author or '' }}</small><p>{{ n.body }}</p></div>{% endfor %}
+      <h3>Activity</h3>
+      {% for a in activities %}<p class="li"><small>{{ a.created_at[:16]|replace('T', ' ') }}</small> {{ a.activity }}{% if a.detail %}: {{ a.detail }}{% endif %}</p>{% endfor %}
+    </div>
+  </div>
+  {% endif %}
+  <form method="post" action="/admin/cqc/lists/add" class="inline-form list-add">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="provider_ids" value="{{ p.provider_id }}">
+    <label class="sr-only" for="pl">List</label><select id="pl" name="list_id"><option value="">Add to list…</option>{% for l in lists %}<option value="{{ l.list_id }}">{{ l.name }}</option>{% endfor %}</select>
+    <label class="sr-only" for="pn">New list</label><input id="pn" name="new_list" placeholder="…or new list name" maxlength="80">
+    <button class="btn btn--ghost-dark btn--sm">Add to list</button>
+  </form>
+</div>
+{% endblock %}

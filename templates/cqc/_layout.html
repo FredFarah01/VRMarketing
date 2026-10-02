@@ -1,0 +1,30 @@
+{% extends "base.html" %}
+{% block meta %}<meta name="robots" content="noindex">{% endblock %}
+{% block body_class %}page-admin page-cqc{% endblock %}
+{% block header %}
+<header class="site-header site-header--admin">
+  <div class="container container--wide site-header__inner">
+    <a href="/admin/cqc">{{ logo(true) }}</a>
+    <nav class="cqc-nav" aria-label="Prospecting">
+      {% set nav = [('/admin/cqc', 'Dashboard'), ('/admin/cqc/search', 'Search'), ('/admin/cqc/new-registrations', 'New Registrations'), ('/admin/cqc/leads', 'Leads'), ('/admin/cqc/lists', 'Lists'), ('/admin/cqc/saved-searches', 'Saved Searches')] %}
+      {% for href, label in nav %}<a href="{{ href }}" class="{{ 'is-active' if request.path == href }}">{{ label }}</a>{% endfor %}
+      {% if staff_role == 'admin' %}
+      <a href="/admin/settings/integrations/cqc" class="{{ 'is-active' if 'integrations' in request.path }}">Settings › CQC</a>
+      <a href="/admin/marketing/leads">Marketing Leads</a>
+      {% endif %}
+      <form method="post" action="/admin/logout"><button class="btn btn--ghost btn--sm" type="submit">Log out</button></form>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<section class="admin">
+  <div class="container container--wide">
+    {% with messages = get_flashed_messages(with_categories=true) %}
+      {% for cat, msg in messages %}<div class="flash flash--{{ cat }}" role="status">{{ msg }}</div>{% endfor %}
+    {% endwith %}
+    {% block admin %}{% endblock %}
+  </div>
+</section>
+{% endblock %}

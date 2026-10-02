@@ -1,0 +1,52 @@
+{% extends "cqc/_layout.html" %}
+{% block title %}Settings › Integrations › CQC | Veridyn Recruit{% endblock %}
+{% block meta %}<meta name="robots" content="noindex">{% if running %}<meta http-equiv="refresh" content="10">{% endif %}{% endblock %}
+{% block admin %}
+<div class="admin__head"><div><p class="eyebrow">Settings › Integrations</p><h1>CQC Syndication API</h1>
+  <p><span class="pill pill--{{ 'green' if connected else 'red' }}">{{ 'Connected' if connected else 'Disconnected' }}</span> {{ base_url }}{% if not connected %} · add the <code>CQC_API_KEY</code> secret to connect{% endif %}</p></div></div>
+{% if running %}<div class="flash flash--ok">A sync job is running. This page refreshes every 10 seconds.</div>{% endif %}
+<div class="kpis kpis--6">
+  <div class="kpi"><span>Last successful sync</span><strong class="kpi--sm">{{ (last_ok.finished_at or '')[:16]|replace('T', ' ') if last_ok else 'Never' }}</strong></div>
+  <div class="kpi"><span>Providers stored</span><strong>{{ '{:,}'.format(stats.providers) }}</strong></div>
+  <div class="kpi"><span>Active providers</span><strong>{{ '{:,}'.format(stats.active_providers) }}</strong></div>
+  <div class="kpi"><span>Locations stored</span><strong>{{ '{:,}'.format(stats.locations) }}</strong></div>
+  <div class="kpi"><span>Active locations</span><strong>{{ '{:,}'.format(stats.active_locations) }}</strong></div>
+  <div class="kpi"><span>Failed records</span><strong>{{ stats.failed }}</strong></div>
+</div>
+<div class="card panel">
+  <h2>Actions</h2>
+  <form method="post" action="/admin/settings/integrations/cqc/action" class="action-row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn--ghost-dark btn--sm" name="action" value="test">Test connection</button>
+    <button class="btn btn--primary btn--sm" name="action" value="{{ 'incremental' if last_ok else 'full' }}" {{ 'disabled' if running }}>Sync now{{ '' if last_ok else ' (initial full import)' }}</button>
+    <button class="btn btn--ghost-dark btn--sm" name="action" value="providers" {{ 'disabled' if running }}>Sync providers</button>
+    <button class="btn btn--ghost-dark btn--sm" name="action" value="locations" {{ 'disabled' if running }}>Sync locations</button>
+    <button class="btn btn--ghost-dark btn--sm" name="action" value="retry" {{ 'disabled' if running or not stats.failed }}>Retry failed</button>
+    <button class="btn btn--ghost-dark btn--sm" name="action" value="reclassify">Reclassify all</button>
+  </form>
+  <p class="small-note">Automatic incremental sync runs every {{ auto_hours }} hours after the initial import (set <code>CQC_AUTO_SYNC_HOURS</code>; 0 turns it off). A full import fetches every provider and location detail record from CQC, so it can take several hours.</p>
+  <h3>Sample data</h3>
+  <form method="post" action="/admin/settings/integrations/cqc/action" class="action-row">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <button class="btn btn--ghost-dark btn--sm" name="action" value="sample_load">Load fictional sample data</button>
+    <button class="btn btn--ghost-dark btn--sm" name="action" value="sample_clear" {{ 'disabled' if not stats.sample }}>Remove sample data ({{ stats.sample }} records)</button>
+  </form>
+  <p class="small-note">Sample records follow the CQC provider/location schemas but are fictional, use IDs starting <code>SAMPLE-</code> and are labelled “Sample data” everywhere.</p>
+</div>
+{% if errors %}<div class="card panel"><h2>Recent API errors</h2>{% for e in errors %}<p class="li"><small>{{ e.started_at[:16]|replace('T', ' ') }}</small> {{ e.job_type }}: {{ e.message }}</p>{% endfor %}</div>{% endif %}
+{% if failures %}<div class="card panel"><h2>Failed records</h2><div class="table-scroll"><table class="admin-table cqc-table--compact"><thead><tr><th>Type</th><th>ID</th><th>Error</th><th>Attempts</th><th>Last attempt</th></tr></thead><tbody>
+{% for f in failures %}<tr><td>{{ f.entity_type }}</td><td>{{ f.entity_id }}</td><td>{{ f.error }}</td><td>{{ f.attempts }}</td><td>{{ (f.last_attempt_at or '')[:16]|replace('T', ' ') }}</td></tr>{% endfor %}</tbody></table></div></div>{% endif %}
+<div class="card panel" id="log"><h2>Sync log</h2><div class="table-scroll"><table class="admin-table cqc-table--compact">
+  <thead><tr><th>#</th><th>Job</th><th>Status</th><th>Started</th><th>Finished</th><th>Window</th><th>Processed</th><th>Failed</th><th>Message</th></tr></thead>
+  <tbody>{% for r in log_rows %}<tr><td>{{ r.id }}</td><td>{{ job_types.get(r.job_type, r.job_type) }}</td><td><span class="pill pill--{{ {'success':'green','partial':'amber','running':'blue'}.get(r.status, 'red') }}">{{ r.status }}</span></td><td>{{ r.started_at[:16]|replace('T', ' ') }}</td><td>{{ (r.finished_at or '')[:16]|replace('T', ' ') }}</td><td><small>{{ (r.window_start or '')[:16] }}{% if r.window_start %} → {% endif %}{{ (r.window_end or '')[:16] if r.window_start else '' }}</small></td><td>{{ r.records_processed }}</td><td>{{ r.records_failed }}</td><td><small>{{ r.message or '' }}</small></td></tr>
+  {% else %}<tr><td colspan="9" class="empty">No sync jobs yet.</td></tr>{% endfor %}</tbody></table></div></div>
+<div class="card panel"><h2>Possible duplicates (shared Companies House number)</h2>
+  {% for ch, rows in dupes.items() %}<p class="li"><strong>{{ ch }}</strong>: {% for r in rows %}<a href="/admin/cqc/providers/{{ r.provider_id }}">{{ r.name }} ({{ r.provider_id }})</a>{{ ', ' if not loop.last }}{% endfor %}</p>{% else %}<p class="muted">None found.</p>{% endfor %}
+  <p class="small-note">Flagged for review only. Records are kept separately by CQC Provider ID and are never merged automatically.</p></div>
+<div class="card panel" id="rules"><h2>Classification, tiers, signals &amp; Veridyn Lead Score rules</h2>
+  <p class="small-note">Segments are matched with case-insensitive “contains” conditions on CQC fields (<code>organisation_type</code>, <code>location_types</code>, <code>service_types</code>, <code>specialisms</code>, <code>regulated_activities</code>, <code>inspection_categories</code>, <code>care_home</code>, <code>inspection_directorate</code>, <code>name</code>). A rule matches when any “any” condition and every “all” condition match. Unmatched records are kept and labelled NON-TARGET. Saving reclassifies every record.</p>
+  <form method="post" action="/admin/settings/integrations/cqc/rules"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><label class="sr-only" for="rules-json">Rules JSON</label><textarea id="rules-json" name="rules" rows="24" class="code" spellcheck="false">{{ rules_json }}</textarea>
+    <div class="action-row"><button class="btn btn--primary btn--sm">Save rules &amp; reclassify</button></div></form>
+  <form method="post" action="/admin/settings/integrations/cqc/rules/reset" onsubmit="return confirm('Reset rules to defaults?')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="text-link btn-link">Reset to defaults</button></form>
+</div>
+{% endblock %}

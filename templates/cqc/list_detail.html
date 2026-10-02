@@ -1,0 +1,20 @@
+{% extends "cqc/_layout.html" %}
+{% from "cqc/_macros.html" import rating, status, segs, source %}
+{% block title %}{{ lst.name }} | Lead List | Veridyn Recruit{% endblock %}
+{% block admin %}
+<a class="text-link" href="/admin/cqc/lists">‹ All lists</a>
+<div class="admin__head"><div><p class="eyebrow">Lead List</p><h1>{{ lst.name }}</h1><p>{{ rows|length }} providers</p></div>
+  <div class="head-actions">
+    {% if staff_role == 'admin' %}<a class="btn btn--ghost-dark btn--sm" href="/admin/cqc/lists/{{ lst.list_id }}/export.csv">Export CSV</a><a class="btn btn--ghost-dark btn--sm" href="/admin/cqc/lists/{{ lst.list_id }}/export.xlsx">Export XLSX</a>{% endif %}
+    <form method="post" action="/admin/cqc/lists/{{ lst.list_id }}/delete" onsubmit="return confirm('Delete this list? Providers and leads are not affected.')"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn--ghost-dark btn--sm">Delete list</button></form>
+  </div></div>
+<div class="table-scroll card"><table class="admin-table cqc-table">
+  <thead><tr><th>Provider</th><th>Segment</th><th>Locations</th><th>Location</th><th>CQC Rating</th><th>Veridyn Lead Score</th><th>Lead Status</th><th></th></tr></thead>
+  <tbody>{% for r in rows %}<tr>
+    <td><a class="row-title" href="/admin/cqc/providers/{{ r.provider_id }}">{{ r.name }}</a><br>{{ status(r.registration_status) }} {{ source(r.source) }}</td>
+    <td>{{ segs(r.segments) }}</td><td>{{ r.location_count or 0 }}<br><small>{{ r.size_tier or '' }}</small></td>
+    <td>{{ r.town_city or '' }}<br><small>{{ r.postal_code or '' }}</small></td><td>{{ rating(r.current_rating) }}</td>
+    <td><span class="score">{{ r.lead_score or 0 }}</span></td><td>{{ r.lead_status or '—' }}</td>
+    <td><form method="post" action="/admin/cqc/lists/{{ lst.list_id }}/remove"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><input type="hidden" name="provider_id" value="{{ r.provider_id }}"><button class="text-link btn-link">Remove</button></form></td></tr>
+  {% else %}<tr><td colspan="8" class="empty">This list is empty.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

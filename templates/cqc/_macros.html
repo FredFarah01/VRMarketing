@@ -1,0 +1,15 @@
+{% macro rating(r) -%}
+{% if r %}<span class="rating rating--{{ r|lower|replace(' ', '-') }}">{{ r }}</span>{% else %}<span class="muted">Not yet rated</span>{% endif %}
+{%- endmacro %}
+{% macro status(s) -%}
+<span class="pill pill--{{ 'green' if s == 'Registered' else 'slate' }}">{{ 'Active' if s == 'Registered' else (s or 'Unknown') }}</span>
+{%- endmacro %}
+{% macro segs(value) -%}
+{% for s in value|pipes %}<span class="seg seg--{{ 'muted' if s in ('NON-TARGET', 'OTHER SOCIAL CARE') else ('group' if s == 'MULTI-SITE CARE GROUP' else 'on') }}">{{ s }}</span>{% endfor %}
+{%- endmacro %}
+{% macro source(s) -%}
+{% if s == 'SAMPLE' %}<span class="pill pill--amber" title="Fictional sample record, not CQC data">Sample data</span>{% endif %}
+{%- endmacro %}
+{% macro dd(label, value) -%}
+<div><dt>{{ label }}</dt><dd>{{ value if value not in (None, '') else '—' }}</dd></div>
+{%- endmacro %}

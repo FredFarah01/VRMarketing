@@ -1,0 +1,155 @@
+{% extends "cqc/_layout.html" %}
+{% from "cqc/_macros.html" import rating, status, segs, source %}
+{% block title %}CQC Provider Database | Veridyn Recruit{% endblock %}
+{% block admin %}
+{% set f = filters %}
+<div class="admin__head">
+  <div><p class="eyebrow">CQC PROVIDER DATABASE</p><h1>{{ title }}</h1><p>{{ '{:,}'.format(total) }} {{ view }} match your search</p></div>
+  <div class="head-actions">
+    {% if staff_role == 'admin' %}
+    <a class="btn btn--ghost-dark btn--sm" href="/admin/cqc/export.csv?{{ query_string }}">Export CSV</a>
+    <a class="btn btn--ghost-dark btn--sm" href="/admin/cqc/export.xlsx?{{ query_string }}">Export XLSX</a>
+    {% endif %}
+  </div>
+</div>
+
+{% if preset_new %}
+<div class="tabs" role="tablist" aria-label="Registration window">
+  {% for days, label in windows %}<a role="tab" class="{{ 'is-active' if f.new == days|string }}" href="?{{ qs('new', 'page', new=days) }}">{{ label }}</a>{% endfor %}
+</div>
+<p class="small-note">Shows the date the provider or location was registered with CQC. A new registration does not necessarily mean the organisation has just started trading.</p>
+{% endif %}
+
+<form class="cqc-search card" method="get" role="search">
+  <input type="hidden" name="view" value="{{ view }}">
+  {% if preset_new %}<input type="hidden" name="new" value="{{ f.new }}">{% endif %}
+  <div class="cqc-search__main">
+    <label class="sr-only" for="q">Search</label>
+    <input id="q" name="q" type="search" value="{{ f.q }}" placeholder="Provider or location name, CQC provider/location ID, Companies House no., postcode, town, local authority">
+    <div class="seg-toggle" role="group" aria-label="Registration status">
+      {% for v, label in [('active', 'Active'), ('inactive', 'Inactive'), ('all', 'All')] %}
+      <label><input type="radio" name="status" value="{{ v }}" {{ 'checked' if f.status == v }} onchange="this.form.submit()"><span>{{ label }}</span></label>
+      {% endfor %}
+    </div>
+    <button class="btn btn--primary btn--sm" type="submit">Search</button>
+  </div>
+  <details class="adv" {{ 'open' if (f.values()|select|list|length) > 2 }}>
+    <summary>Advanced filters</summary>
+    <div class="adv__grid">
+      {% macro sel(name, label, options, current) -%}
+      <label>{{ label }}<select name="{{ name }}"><option value="">Any</option>{% for o in options %}<option {{ 'selected' if current == o }}>{{ o }}</option>{% endfor %}</select></label>
+      {%- endmacro %}
+      {{ sel('segment', 'Target segment', segments, f.segment) }}
+      {{ sel('org_type', 'Organisation type', facets.org_type, f.org_type) }}
+      {{ sel('ownership', 'Ownership type', facets.ownership, f.ownership) }}
+      <label>Care home<select name="care_home"><option value="">Any</option><option value="Y" {{ 'selected' if f.care_home == 'Y' }}>Care home</option><option value="N" {{ 'selected' if f.care_home == 'N' }}>Not a care home</option></select></label>
+      {{ sel('service_type', 'Service type', facets.service_type, f.service_type) }}
+      {{ sel('specialism', 'Specialism', facets.specialism, f.specialism) }}
+      {{ sel('activity', 'Regulated activity', facets.activity, f.activity) }}
+      {{ sel('location_type', 'Location type', facets.location_type, f.location_type) }}
+      {{ sel('region', 'Region', facets.region, f.region) }}
+      {{ sel('county', 'County', facets.county, f.county) }}
+      {{ sel('town', 'Town/city', facets.town, f.town) }}
+      {{ sel('la', 'Local authority', facets.la, f.la) }}
+      {{ sel('icb', 'ICB', facets.icb, f.icb) }}
+      {{ sel('constituency', 'Constituency', facets.constituency, f.constituency) }}
+      <label>Postcode<input name="postcode" value="{{ f.postcode }}" placeholder="e.g. LS1 4AP"></label>
+      <label>Radius (miles)<select name="radius">{% for r in ['1','5','10','25','50'] %}<option {{ 'selected' if (f.radius or '10') == r }}>{{ r }}</option>{% endfor %}</select></label>
+      {{ sel('rating', 'CQC rating', ratings, f.rating) }}
+      <label>Last inspected<select name="inspected"><option value="">Any time</option>{% for d, l in [('90','Last 3 months'),('182','Last 6 months'),('365','Last 12 months'),('730','Last 2 years')] %}<option value="{{ d }}" {{ 'selected' if f.inspected == d }}>{{ l }}</option>{% endfor %}</select></label>
+      <label>Registered from<input type="date" name="reg_from" value="{{ f.reg_from }}"></label>
+      <label>Registered to<input type="date" name="reg_to" value="{{ f.reg_to }}"></label>
+      {{ sel('size_tier', 'Location count tier', facets.size_tier, f.size_tier) }}
+      <label>Min locations<input type="number" min="0" name="min_locations" value="{{ f.min_locations }}"></label>
+      <label>Max locations<input type="number" min="0" name="max_locations" value="{{ f.max_locations }}"></label>
+      <label>Min beds<input type="number" min="0" name="min_beds" value="{{ f.min_beds }}"></label>
+      <label>Max beds<input type="number" min="0" name="max_beds" value="{{ f.max_beds }}"></label>
+      {{ sel('lead_status', 'Lead status', lead_statuses, f.lead_status) }}
+      <label>In leads<select name="in_leads"><option value="">Any</option><option value="yes" {{ 'selected' if f.in_leads == 'yes' }}>Already a lead</option><option value="no" {{ 'selected' if f.in_leads == 'no' }}>Not yet a lead</option></select></label>
+      <label>Opportunity signal<input name="signal" value="{{ f.signal }}" placeholder="e.g. New CQC registration"></label>
+    </div>
+    <div class="adv__actions"><button class="btn btn--primary btn--sm" type="submit">Apply filters</button><a class="text-link" href="?view={{ view }}{% if preset_new %}&new={{ f.new }}{% endif %}">Reset</a></div>
+  </details>
+</form>
+
+{% for n in notes %}<div class="flash flash--error">{{ n }}</div>{% endfor %}
+
+<div class="results-bar">
+  <div class="seg-toggle seg-toggle--links">
+    <a class="{{ 'is-active' if view == 'providers' }}" href="?{{ qs('view', 'page', 'sort', view='providers') }}">Providers</a>
+    <a class="{{ 'is-active' if view == 'locations' }}" href="?{{ qs('view', 'page', 'sort', view='locations') }}">Locations</a>
+  </div>
+  <form method="post" action="/admin/cqc/saved-searches" class="inline-form">
+    <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+    <input type="hidden" name="query" value="{{ query_string }}">
+    <label class="sr-only" for="ss-name">Saved search name</label>
+    <input id="ss-name" name="name" placeholder="Name this search" maxlength="80" required>
+    <button class="btn btn--ghost-dark btn--sm" type="submit">Save search</button>
+  </form>
+</div>
+
+{% macro th(key, label) -%}
+<th><a class="sort {{ 'is-' ~ direction if sort == key }}" href="?{{ qs('sort', 'dir', 'page', sort=key, dir=('asc' if sort == key and direction == 'desc' else 'desc')) }}">{{ label }}</a></th>
+{%- endmacro %}
+
+<form method="post" action="/admin/cqc/lists/add" id="bulk">
+  <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+  <div class="table-scroll card">
+    <table class="admin-table cqc-table">
+      <thead><tr>
+        <th><label class="sr-only" for="sel-all">Select all</label><input type="checkbox" id="sel-all" onclick="document.querySelectorAll('.row-sel').forEach(c => c.checked = this.checked)"></th>
+        {% if view == 'providers' %}
+          {{ th('name', 'Provider') }}<th>Target Segment</th>{{ th('locations', 'Locations') }}<th>Location</th>{{ th('rating', 'CQC Rating') }}{{ th('registered', 'Registered') }}<th>Contact</th>{{ th('score', 'Veridyn Lead Score') }}<th>Lead</th>
+        {% else %}
+          {{ th('name', 'Location') }}<th>Provider</th><th>Target Segment</th><th>Service Type</th>{{ th('beds', 'Beds') }}{{ th('rating', 'CQC Rating') }}{{ th('registered', 'Registered') }}<th>Location</th>{{ th('score', 'Veridyn Lead Score') }}<th>Lead</th>
+        {% endif %}
+      </tr></thead>
+      <tbody>
+      {% for r in rows %}
+        <tr>
+          <td><input class="row-sel" type="checkbox" name="provider_ids" value="{{ r.provider_id }}" aria-label="Select {{ r.name }}"></td>
+          {% if view == 'providers' %}
+            <td><a class="row-title" href="/admin/cqc/providers/{{ r.provider_id }}">{{ r.name }}</a><br><small>{{ r.provider_id }}{% if r.companies_house_number %} · CH {{ r.companies_house_number }}{% endif %}</small><br>{{ status(r.registration_status) }} {{ source(r.source) }}</td>
+            <td>{{ segs(r.segments) }}</td>
+            <td><strong class="loc-count">{{ r.location_count or 0 }}</strong>{% if r.size_tier %}<br><small>{{ r.size_tier }}</small>{% endif %}</td>
+            <td>{{ r.town_city or '—' }}<br><small>{{ r.postal_code or '' }} · {{ r.local_authority or r.region or '' }}</small></td>
+            <td>{{ rating(r.current_rating) }}</td>
+            <td>{{ r.registration_date or '—' }}</td>
+            <td>{% if r.website %}<a href="{{ r.website if r.website.startswith('http') else 'https://' ~ r.website }}" target="_blank" rel="noopener noreferrer">Website</a><br>{% endif %}<small>{{ r.main_phone_number or '' }}</small></td>
+          {% else %}
+            <td><a class="row-title" href="/admin/cqc/locations/{{ r.location_id }}">{{ r.name }}</a><br><small>{{ r.location_id }}</small><br>{{ status(r.registration_status) }} {{ source(r.source) }}</td>
+            <td><a href="/admin/cqc/providers/{{ r.provider_id }}">{{ r.provider_name or r.provider_id }}</a><br><small>{{ r.location_count or 0 }} locations{% if r.size_tier %} · {{ r.size_tier }}{% endif %}</small></td>
+            <td>{{ segs(r.segments) }}</td>
+            <td><small>{{ (r.service_types|pipes)|join(', ') or '—' }}</small>{% if r.care_home == 'Y' %}<br><span class="pill pill--blue">Care home</span>{% endif %}</td>
+            <td>{{ r.number_of_beds or '—' }}</td>
+            <td>{{ rating(r.current_rating) }}</td>
+            <td>{{ r.registration_date or '—' }}</td>
+            <td>{{ r.town_city or '—' }}<br><small>{{ r.postal_code or '' }} · {{ r.local_authority or '' }}</small></td>
+          {% endif %}
+          <td><span class="score" title="Veridyn Lead Score (internal, not a CQC score)">{{ r.lead_score or 0 }}</span>
+            {% set sig = r.signals|fromjson %}{% if sig %}<br><small title="{{ sig|join('; ') }}">{{ sig[:2]|join(' · ') }}{% if sig|length > 2 %} +{{ sig|length - 2 }}{% endif %}</small>{% endif %}</td>
+          <td>{% if r.lead_status %}<span class="pill pill--green">{{ r.lead_status }}</span>{% elif r.provider_id %}<button class="btn btn--primary btn--xs" formaction="/admin/cqc/providers/{{ r.provider_id }}/lead" type="submit">Add to leads</button>{% endif %}</td>
+        </tr>
+      {% else %}
+        <tr><td colspan="11" class="empty">No {{ view }} match your search.{% if f.status == 'active' %} Try including inactive registrations.{% endif %}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+  </div>
+  <div class="bulk-bar">
+    <span>With selected:</span>
+    <label class="sr-only" for="list-id">Existing list</label>
+    <select id="list-id" name="list_id"><option value="">Choose a list…</option>{% for l in lists %}<option value="{{ l.list_id }}">{{ l.name }}</option>{% endfor %}</select>
+    <label class="sr-only" for="new-list">New list name</label>
+    <input id="new-list" name="new_list" placeholder="…or new list name" maxlength="80">
+    <label class="check"><input type="checkbox" name="also_leads" value="1"> Also add to leads</label>
+    <button class="btn btn--primary btn--sm" type="submit">Add to list</button>
+  </div>
+</form>
+
+<nav class="pager" aria-label="Pagination">
+  {% if page > 1 %}<a href="?{{ qs('page', page=page - 1) }}">‹ Previous</a>{% endif %}
+  <span>Page {{ page }} of {{ '{:,}'.format(pages) }}</span>
+  {% if page < pages %}<a href="?{{ qs('page', page=page + 1) }}">Next ›</a>{% endif %}
+</nav>
+{% endblock %}
