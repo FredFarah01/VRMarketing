@@ -1,0 +1,63 @@
+{% extends "cqc/_layout.html" %}
+{% from "cqc/_macros.html" import rating, status, segs, source, dd %}
+{% block title %}{{ loc.name }} | CQC Location | Veridyn Recruit{% endblock %}
+{% block admin %}
+<a class="text-link" href="{{ '/admin/cqc/providers/' ~ loc.provider_id if provider else '/admin/cqc/search?view=locations' }}">‹ {{ 'Back to ' ~ provider.name if provider else 'Back to search' }}</a>
+<div class="profile-head card">
+  <div>
+    <p class="eyebrow">CQC Location</p>
+    <h1>{{ loc.name }}</h1>
+    <p class="profile-meta">{{ status(loc.registration_status) }} {{ source(loc.source) }} <span>CQC Location ID <strong>{{ loc.location_id }}</strong></span><span>Provider {% if provider %}<a href="/admin/cqc/providers/{{ provider.provider_id }}"><strong>{{ provider.name }}</strong></a>{% else %}<strong>{{ loc.provider_id }}</strong> (not synchronised){% endif %}</span></p>
+    <div class="profile-segs">{{ segs(cls.segments if cls else '') }}</div>
+  </div>
+  <div class="profile-stats">
+    <div><span>CQC Rating</span>{{ rating(loc.current_rating) }}</div>
+    <div><span>Beds</span><strong>{{ loc.number_of_beds or '—' }}</strong><small>{{ 'Care home' if loc.care_home == 'Y' else 'Not a care home' }}</small></div>
+    <div><span>Provider locations</span><strong>{{ pcls.location_count if pcls else '—' }}</strong><small>{{ pcls.size_tier if pcls else '' }}</small></div>
+  </div>
+  <div class="profile-actions">
+    {% if loc.website %}<a class="btn btn--ghost-dark btn--sm" href="{{ loc.website if loc.website.startswith('http') else 'https://' ~ loc.website }}" target="_blank" rel="noopener noreferrer">Website</a>{% endif %}
+    {% if loc.main_phone_number %}<a class="btn btn--ghost-dark btn--sm" href="tel:{{ loc.main_phone_number }}">{{ loc.main_phone_number }}</a>{% endif %}
+    {% if provider and not acc %}<form method="post" action="/admin/cqc/providers/{{ provider.provider_id }}/lead"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn--primary btn--sm">Add provider to leads</button></form>{% elif acc %}<span class="pill pill--green">Provider is a lead · {{ acc.status }}</span>{% endif %}
+  </div>
+</div>
+{% set signals = cls.signals|fromjson if cls else [] %}
+{% if signals %}<div class="signals">{% for s in signals %}<span class="signal">{{ s }}</span>{% endfor %}</div>{% endif %}
+<div class="profile-grid">
+  <div class="card panel">
+    <h2>Services</h2>
+    {% for s in services %}<p class="li"><strong>{{ s.name }}</strong>{% if s.description and s.description != s.name %}<br><small>{{ s.description }}</small>{% endif %}</p>{% else %}<p class="muted">None recorded.</p>{% endfor %}
+    <h2>Specialisms</h2><p>{{ (loc.specialisms|pipes)|join(', ') or '—' }}</p>
+    <h2>Location types</h2><p>{{ (loc.location_types|pipes)|join(', ') or '—' }}</p>
+    <h2>Regulated activities</h2>
+    {% for a in activities_cqc %}<p class="li">{{ a.name }} <small>({{ a.code }})</small>{% for person in a.contacts_json|fromjson %}<br><small>{{ [person.personTitle, person.personGivenName, person.personFamilyName]|select|join(' ') }}{% if person.personRoles %} · {{ person.personRoles|join(', ') }}{% endif %}</small>{% endfor %}</p>{% else %}<p class="muted">None recorded.</p>{% endfor %}
+    <h2>Inspection categories</h2><p>{{ (loc.inspection_categories|pipes)|join(', ') or '—' }}</p>
+    <h2>Details</h2>
+    <dl class="dl">
+      {{ dd('Registered manager', managers|join(', ') or 'Not listed by CQC') }}
+      {{ dd('Address', [loc.address_line_1, loc.address_line_2, loc.town_city, loc.county, loc.postal_code]|select|join(', ')) }}
+      {{ dd('Region', loc.region) }}{{ dd('Local authority', loc.local_authority) }}{{ dd('ICB', loc.icb_name) }}{{ dd('Constituency', loc.constituency) }}
+      {{ dd('Registration date', loc.registration_date) }}{{ dd('Deregistration date', loc.deregistration_date) }}{{ dd('Dormancy', loc.dormancy) }}
+      {{ dd('Registered manager absent since', loc.registered_manager_absent_date) }}{{ dd('Organisation type', loc.organisation_type) }}{{ dd('Type', loc.type) }}
+      {{ dd('Inspection directorate', loc.inspection_directorate) }}{{ dd('Last inspection', loc.last_inspection_date) }}{{ dd('Last report published', loc.last_report_date) }}
+      {{ dd('ODS code', loc.ods_code) }}{{ dd('UPRN', loc.uprn) }}
+    </dl>
+  </div>
+  <div class="card panel">
+    <h2>CQC ratings</h2>
+    {% for r in ratings %}
+      <div class="rating-row"><div>{{ rating(r.overall_rating) }} {% if r.is_current %}<span class="pill pill--blue">Current</span>{% endif %}</div><small>Report {{ r.report_date or '—' }}</small>
+        {% set kq = r.key_questions_json|fromjson %}{% if kq %}<div class="kq">{% for q in kq %}<span>{{ q.name }}: <strong>{{ q.rating or '—' }}</strong></span>{% endfor %}</div>{% endif %}</div>
+    {% else %}<p class="muted">No ratings published.</p>{% endfor %}
+    <h2>Reports</h2>
+    {% for r in reports %}<p class="li">{{ r.report_date }} · {{ r.report_type or 'Report' }}{% if r.report_uri %} · <a href="https://www.cqc.org.uk{{ r.report_uri }}" target="_blank" rel="noopener noreferrer">View on CQC</a>{% endif %}</p>{% else %}<p class="muted">None recorded.</p>{% endfor %}
+    <h2>Linked locations</h2>
+    {% for r in rels %}<p class="li">{{ r.type }}: <a href="/admin/cqc/locations/{{ r.related_id }}">{{ r.related_name or r.related_id }}</a>{% if r.reason %} <small>({{ r.reason }})</small>{% endif %}</p>{% else %}<p class="muted">No CQC relationships recorded.</p>{% endfor %}
+    <h2>Other locations of this provider</h2>
+    {% for s in siblings %}<p class="li"><a href="/admin/cqc/locations/{{ s.location_id }}">{{ s.name }}</a> <small>{{ s.town_city or '' }}</small> {{ status(s.registration_status) }}</p>{% else %}<p class="muted">None.</p>{% endfor %}
+    <h2>Data source</h2>
+    <p class="small-note">{% if loc.source == 'SAMPLE' %}Fictional sample record, not CQC data.{% else %}Care Quality Commission Syndication API{% endif %} · last synchronised {{ (loc.cqc_synced_at or '')[:16]|replace('T', ' ') }} UTC</p>
+    {% if loc.source != 'SAMPLE' %}<form method="post" action="/admin/cqc/locations/{{ loc.location_id }}/refresh"><input type="hidden" name="csrf_token" value="{{ csrf_token() }}"><button class="btn btn--ghost-dark btn--sm">Refresh from CQC</button></form>{% endif %}
+  </div>
+</div>
+{% endblock %}

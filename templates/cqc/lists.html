@@ -1,0 +1,9 @@
+{% extends "cqc/_layout.html" %}
+{% block title %}Lead Lists | Veridyn Recruit{% endblock %}
+{% block admin %}
+<div class="admin__head"><div><p class="eyebrow">Prospecting</p><h1>Lead Lists</h1><p>Create lists by selecting providers on the search page.</p></div></div>
+<div class="table-scroll card"><table class="admin-table cqc-table cqc-table--compact">
+  <thead><tr><th>List</th><th>Providers</th><th>Created</th></tr></thead>
+  <tbody>{% for l in rows %}<tr><td><a class="row-title" href="/admin/cqc/lists/{{ l.list_id }}">{{ l.name }}</a></td><td>{{ l.members }}</td><td>{{ l.created_at[:10] }}</td></tr>
+  {% else %}<tr><td colspan="3" class="empty">No lists yet.</td></tr>{% endfor %}</tbody></table></div>
+{% endblock %}

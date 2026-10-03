@@ -29,3 +29,12 @@ Supabase's public API keys.
 
 Data is stored in `marketing_*` tables, kept separate from candidate records.
 Lead scoring rules live in `SCORING_RULES` in `app.py`; scores are internal only.
+
+## CQC prospecting (admin)
+- `/admin/cqc` — dashboard; `/admin/cqc/search` — provider/location search, filters, Add to Leads, lists, CSV/XLSX export
+- `/admin/cqc/leads`, `/admin/cqc/lists`, `/admin/cqc/saved-searches`, `/admin/cqc/new-registrations`
+- `/admin/settings/integrations/cqc` — API connection test, sync jobs, sample data, classification rules
+Set `CQC_API_KEY` in `.env` to pull real CQC data; without it, load the fictional sample data from the control centre.
+CQC data lives in `cqc_*` tables; CRM data in `lead_*` / `saved_searches` and is never overwritten by re-sync.
+Veridyn segments and Lead Score are internal and are not CQC ratings.
+Tests: `python -m unittest discover tests`
