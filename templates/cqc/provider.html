@@ -71,7 +71,7 @@
   <div class="panel-head"><h2>Locations ({{ locations|length + unsynced|length }})</h2>
     <div class="seg-toggle seg-toggle--links">{% for v, l in [('all','All'),('active','Active'),('inactive','Inactive')] %}<a class="{{ 'is-active' if loc_status == v }}" href="?loc_status={{ v }}">{{ l }}</a>{% endfor %}</div></div>
   <div class="table-scroll"><table class="admin-table cqc-table cqc-table--compact">
-    <thead><tr><th>Location</th><th>Registered Manager</th><th>Telephone</th><th>Segment</th><th>Service types</th><th>Beds</th><th>Rating</th><th>Registered</th><th>Town / postcode</th><th>Status</th></tr></thead>
+    <thead><tr><th>Location</th><th>Registered Manager</th><th>Main Telephone</th><th>Segment</th><th>Service types</th><th>Beds</th><th>Rating</th><th>Registered</th><th>Town / postcode</th><th>Status</th></tr></thead>
     <tbody>
     {% for l in locations %}<tr>
       <td><a class="row-title" href="/admin/cqc/locations/{{ l.location_id }}">{{ l.name }}</a><br><small>{{ l.location_id }}</small></td>
