@@ -8,8 +8,15 @@
 <section class="admin">
 <div class="container container--wide">
   <div class="admin__head">
-    <div><h1>CQC Provider Prospects</h1><p>{{ total }} matching providers · {{ imported_total }} providers imported</p></div>
+    <div><h1>CQC Provider Prospects</h1><p>{{ total }} matching providers · {{ imported_total }} providers · {{ imported_locations }} locations imported</p></div>
+    <form method="post" action="/admin/sales/cqc-sync" style="display:flex;gap:.5rem;align-items:center">
+      <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
+      <select name="mode" aria-label="CQC sync mode"><option value="limited">Controlled sync (100)</option><option value="full">Full CQC sync</option></select>
+      <button class="btn btn--primary btn--sm" type="submit" {% if latest_sync and latest_sync.status == 'Running' %}disabled{% endif %}>{{ 'Sync running…' if latest_sync and latest_sync.status == 'Running' else 'Sync CQC Data' }}</button>
+    </form>
   </div>
+  {% if sync_notice == 'started' %}<div class="card" style="padding:1rem;margin-bottom:1rem"><strong>CQC sync started.</strong> Refresh this page to see progress.</div>{% elif sync_notice == 'running' %}<div class="card" style="padding:1rem;margin-bottom:1rem"><strong>A CQC sync is already running.</strong></div>{% endif %}
+  {% if latest_sync %}<div class="card" style="padding:1rem;margin-bottom:1rem"><strong>Latest CQC sync:</strong> {{ latest_sync.status }} · {{ latest_sync.sync_type }} · started {{ latest_sync.started_at }}{% if latest_sync.completed_at %} · completed {{ latest_sync.completed_at }}{% endif %}<br><small>{{ latest_sync.providers_seen or 0 }} providers · {{ latest_sync.locations_seen or 0 }} locations · {{ latest_sync.records_changed or 0 }} records processed{% if latest_sync.error_message %} · Error: {{ latest_sync.error_message }}{% endif %}</small></div>{% endif %}
   <form class="filters cqc-filters" method="get" role="search">
     <input name="q" type="search" value="{{ filters.q }}" placeholder="Organisation or location">
     <input name="area" type="search" value="{{ filters.area }}" placeholder="Postcode, town or county">
