@@ -1,0 +1,61 @@
+{% extends "base.html" %}
+{% block title %}CQC Prospects | Veridyn Recruit Admin{% endblock %}
+{% block meta %}<meta name="robots" content="noindex">{% endblock %}
+{% block body_class %}page-admin{% endblock %}
+{% block header %}
+<header class="site-header site-header--admin">
+  <div class="container container--wide site-header__inner">
+    <a href="/admin/marketing/leads">{{ logo(true) }}</a>
+    <nav class="site-nav" aria-label="Admin">
+      <a class="site-nav__link" href="/admin/marketing/leads">Leads</a>
+      <span class="site-nav__crumb">Sales › <strong>CQC Prospects</strong></span>
+      <form method="post" action="/admin/logout"><button class="btn btn--ghost btn--sm" type="submit">Log out</button></form>
+    </nav>
+  </div>
+</header>
+{% endblock %}
+{% block footer %}{% endblock %}
+{% block content %}
+<section class="admin">
+<div class="container container--wide">
+  <div class="admin__head">
+    <div><h1>CQC Provider Prospects</h1><p>{{ total }} matching providers · {{ imported_total }} providers imported</p></div>
+  </div>
+  <form class="filters cqc-filters" method="get" role="search">
+    <input name="q" type="search" value="{{ filters.q }}" placeholder="Organisation or location">
+    <input name="area" type="search" value="{{ filters.area }}" placeholder="Postcode, town or county">
+    <select name="service"><option value="">All service types</option>{% for s in service_types %}<option value="{{ s }}" {{ 'selected' if filters.service==s }}>{{ s }}</option>{% endfor %}</select>
+    <select name="rating"><option value="">All ratings</option>{% for s in ratings %}<option value="{{ s }}" {{ 'selected' if filters.rating==s }}>{{ s }}</option>{% endfor %}</select>
+    <select name="status"><option value="">All registration statuses</option>{% for s in registration_statuses %}<option value="{{ s }}" {{ 'selected' if filters.status==s }}>{{ s }}</option>{% endfor %}</select>
+    <select name="multi"><option value="">Any number of locations</option><option value="2" {{ 'selected' if filters.multi=='2' }}>2+ locations</option><option value="5" {{ 'selected' if filters.multi=='5' }}>5+ locations</option><option value="10" {{ 'selected' if filters.multi=='10' }}>10+ locations</option></select>
+    <button class="btn btn--primary btn--sm" type="submit">Filter prospects</button>
+    <a class="text-link" href="/admin/sales/cqc-prospects">Reset</a>
+  </form>
+  <div class="table-scroll card">
+    <table class="admin-table">
+      <thead><tr><th>Provider</th><th>Area</th><th>Locations</th><th>Services</th><th>Ratings</th><th>Website</th><th>Account</th></tr></thead>
+      <tbody>
+      {% for p in prospects %}
+      <tr>
+        <td><strong>{{ p.provider_name }}</strong><br><small>CQC {{ p.provider_id }} · {{ p.registration_status or 'Status unavailable' }}</small></td>
+        <td>{{ p.town_city or '—' }}{% if p.county %}<br><small>{{ p.county }}</small>{% endif %}{% if p.postcode %}<br><small>{{ p.postcode }}</small>{% endif %}</td>
+        <td><strong>{{ p.location_count }}</strong></td>
+        <td><small>{{ p.service_types or '—' }}</small></td>
+        <td><small>{{ p.ratings or 'Not yet rated / unavailable' }}</small></td>
+        <td>{% if p.website %}<a href="{{ p.website }}" target="_blank" rel="noopener">Website</a>{% else %}—{% endif %}</td>
+        <td>{% if p.account_id %}<span class="pill pill--slate">{{ p.priority }} · {{ p.account_score }}</span><br><small>{{ p.sales_status }}</small>{% else %}<small>Not yet qualified</small>{% endif %}</td>
+      </tr>
+      {% else %}<tr><td colspan="7" class="empty">No CQC providers match these filters. Import CQC data first if the database is empty.</td></tr>{% endfor %}
+      </tbody>
+    </table>
+  </div>
+  {% if pages > 1 %}
+  <nav class="pagination" aria-label="Prospect pages">
+    {% if page > 1 %}<a class="btn btn--ghost btn--sm" href="{{ page_url(page-1) }}">Previous</a>{% endif %}
+    <span>Page {{ page }} of {{ pages }}</span>
+    {% if page < pages %}<a class="btn btn--ghost btn--sm" href="{{ page_url(page+1) }}">Next</a>{% endif %}
+  </nav>
+  {% endif %}
+</div>
+</section>
+{% endblock %}
