@@ -293,6 +293,7 @@ def run_sync(limit=None, dry_run=False):
         db.commit()
         return {"sync_id": sync_id, "providers_seen": provider_count, "locations_seen": location_count, "records_changed": changed}
     except Exception as exc:
+        db.rollback()
         db.execute(
             "UPDATE cqc_sync_runs SET status='Failed', completed_at=?, error_message=? WHERE sync_id=?",
             (now_iso(), str(exc)[:2000], sync_id),
