@@ -282,6 +282,11 @@ def run_sync(limit=None, dry_run=False):
         for summary in iter_collection("locations", "locations", limit=limit):
             location_id = _first(summary, "locationId", "locationID", "id")
             detail = fetch_location(location_id) if location_id else summary
+            parent_id = _first(detail, "providerId", "providerID")
+            parent_exists = db.execute("SELECT provider_id FROM cqc_providers WHERE provider_id=?", (parent_id,)).fetchone() if parent_id else None
+            if parent_id and not parent_exists:
+                parent_detail = fetch_provider(parent_id)
+                _upsert_provider(db, parent_detail)
             location_count += 1
             changed += int(_upsert_location(db, detail))
 
