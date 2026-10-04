@@ -39,7 +39,7 @@
       <tbody>
       {% for p in prospects %}
       <tr>
-        <td><strong>{{ p.provider_name }}</strong><br><small>CQC {{ p.provider_id }} · {{ p.registration_status or 'Status unavailable' }}</small></td>
+        <td>{% if p.account_id %}<a href="/admin/sales/accounts/{{ p.account_id }}"><strong>{{ p.provider_name }}</strong></a>{% else %}<strong>{{ p.provider_name }}</strong>{% endif %}<br><small>CQC {{ p.provider_id }} · {{ p.registration_status or 'Status unavailable' }}</small></td>
         <td>{{ p.town_city or '—' }}{% if p.county %}<br><small>{{ p.county }}</small>{% endif %}{% if p.postcode %}<br><small>{{ p.postcode }}</small>{% endif %}</td>
         <td><strong>{{ p.location_count }}</strong></td>
         <td><small>{{ p.service_types or '—' }}</small></td>
