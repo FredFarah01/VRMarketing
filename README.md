@@ -53,3 +53,15 @@ python cqc_sync.py --full
 ```
 
 The sync imports providers first, then locations, retains the raw API payload for traceability, normalises service types/specialisms/regulated activities, and records each run in `cqc_sync_runs`. Never commit the CQC API key.
+
+
+### Account classification and scoring
+
+After a CQC import, generate/update sales accounts with explainable CQC-derived scores:
+
+```
+python account_scoring.py --limit 25
+python account_scoring.py
+```
+
+Priority bands: A1 = 80+, A2 = 60–79, B = 40–59, C = below 40. The score uses target-care service signals, multi-site scale, recent registrations, selected CQC rating signals and website availability. Each score stores its reasons. Re-scoring updates derived fields without overwriting manual sales ownership/status.
