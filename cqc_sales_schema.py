@@ -109,6 +109,27 @@ CREATE INDEX IF NOT EXISTS idx_sales_accounts_score ON sales_accounts(account_sc
 CREATE INDEX IF NOT EXISTS idx_sales_accounts_owner ON sales_accounts(owner);
 CREATE INDEX IF NOT EXISTS idx_sales_accounts_stage ON sales_accounts(lifecycle_stage);
 
+
+CREATE TABLE IF NOT EXISTS sales_opportunities (
+    opportunity_id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL UNIQUE,
+    proposal_value REAL,
+    monthly_license REAL,
+    setup_fee REAL,
+    probability INTEGER NOT NULL DEFAULT 0,
+    expected_close_date TEXT,
+    contract_start_date TEXT,
+    contract_end_date TEXT,
+    commercial_status TEXT NOT NULL DEFAULT 'Open',
+    won_lost_reason TEXT,
+    notes TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES sales_accounts(account_id)
+);
+CREATE INDEX IF NOT EXISTS idx_sales_opportunities_status ON sales_opportunities(commercial_status);
+CREATE INDEX IF NOT EXISTS idx_sales_opportunities_close ON sales_opportunities(expected_close_date);
+
 CREATE TABLE IF NOT EXISTS sales_contacts (
     contact_id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL,
@@ -275,6 +296,7 @@ ALTER TABLE cqc_location_service_types ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cqc_location_specialisms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cqc_location_regulated_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_accounts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_opportunities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_contact_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_activities ENABLE ROW LEVEL SECURITY;
