@@ -654,7 +654,8 @@ def admin_cqc_prospects():
     ratings = [r[0] for r in db.execute(
         "SELECT DISTINCT overall_rating FROM cqc_locations WHERE overall_rating IS NOT NULL ORDER BY overall_rating"
     ).fetchall()]
-    segments = [r[0] for r in db.execute("SELECT DISTINCT target_segment FROM sales_accounts WHERE target_segment IS NOT NULL ORDER BY target_segment").fetchall()]\n    registration_statuses = [r[0] for r in db.execute(
+    segments = [r[0] for r in db.execute("SELECT DISTINCT target_segment FROM sales_accounts WHERE target_segment IS NOT NULL ORDER BY target_segment").fetchall()]
+    registration_statuses = [r[0] for r in db.execute(
         "SELECT DISTINCT registration_status FROM cqc_providers WHERE registration_status IS NOT NULL ORDER BY registration_status"
     ).fetchall()]
 
