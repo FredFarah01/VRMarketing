@@ -178,6 +178,7 @@ MIGRATIONS = [
         created_at TEXT NOT NULL
     );
     """,
+    CQC_SALES_MIGRATION,
 ]
 
 PG_MIGRATIONS = [
@@ -187,6 +188,7 @@ PG_MIGRATIONS = [
     ALTER TABLE marketing_demo_requests ENABLE ROW LEVEL SECURITY;
     ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
     """,
+    CQC_SALES_PG_MIGRATION,
 ]
 
 
