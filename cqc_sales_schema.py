@@ -131,6 +131,29 @@ CREATE TABLE IF NOT EXISTS sales_contacts (
 CREATE INDEX IF NOT EXISTS idx_sales_contacts_account ON sales_contacts(account_id);
 CREATE INDEX IF NOT EXISTS idx_sales_contacts_email ON sales_contacts(email);
 
+
+CREATE TABLE IF NOT EXISTS sales_contact_candidates (
+    candidate_id TEXT PRIMARY KEY,
+    account_id TEXT NOT NULL,
+    email TEXT,
+    phone TEXT,
+    contact_name TEXT,
+    job_title TEXT,
+    contact_type TEXT NOT NULL DEFAULT 'Business',
+    source_url TEXT NOT NULL,
+    source_page_title TEXT,
+    discovery_method TEXT NOT NULL,
+    confidence TEXT NOT NULL DEFAULT 'Found',
+    status TEXT NOT NULL DEFAULT 'Review',
+    evidence TEXT,
+    first_found_at TEXT NOT NULL,
+    last_found_at TEXT NOT NULL,
+    FOREIGN KEY (account_id) REFERENCES sales_accounts(account_id)
+);
+CREATE INDEX IF NOT EXISTS idx_contact_candidates_account ON sales_contact_candidates(account_id);
+CREATE INDEX IF NOT EXISTS idx_contact_candidates_email ON sales_contact_candidates(email);
+CREATE INDEX IF NOT EXISTS idx_contact_candidates_status ON sales_contact_candidates(status);
+
 CREATE TABLE IF NOT EXISTS sales_activities (
     activity_id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL,
@@ -198,6 +221,7 @@ ALTER TABLE cqc_location_specialisms ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cqc_location_regulated_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_contacts ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_contact_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_activities ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_suppressions ENABLE ROW LEVEL SECURITY;
