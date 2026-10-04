@@ -170,6 +170,61 @@ CREATE TABLE IF NOT EXISTS sales_activities (
 CREATE INDEX IF NOT EXISTS idx_sales_activities_account ON sales_activities(account_id);
 CREATE INDEX IF NOT EXISTS idx_sales_activities_occurred ON sales_activities(occurred_at);
 
+
+CREATE TABLE IF NOT EXISTS sales_campaigns (
+    campaign_id TEXT PRIMARY KEY,
+    name TEXT NOT NULL,
+    target_segment TEXT,
+    status TEXT NOT NULL DEFAULT 'Draft',
+    description TEXT,
+    created_at TEXT NOT NULL,
+    updated_at TEXT NOT NULL
+);
+CREATE TABLE IF NOT EXISTS sales_campaign_steps (
+    step_id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL,
+    step_number INTEGER NOT NULL,
+    day_offset INTEGER NOT NULL,
+    channel TEXT NOT NULL,
+    subject_template TEXT,
+    body_template TEXT,
+    task_title TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (campaign_id) REFERENCES sales_campaigns(campaign_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_step_number ON sales_campaign_steps(campaign_id, step_number);
+
+CREATE TABLE IF NOT EXISTS sales_campaign_enrolments (
+    enrolment_id TEXT PRIMARY KEY,
+    campaign_id TEXT NOT NULL,
+    account_id TEXT NOT NULL,
+    contact_id TEXT,
+    status TEXT NOT NULL DEFAULT 'Active',
+    enrolled_at TEXT NOT NULL,
+    current_step INTEGER NOT NULL DEFAULT 1,
+    completed_at TEXT,
+    FOREIGN KEY (campaign_id) REFERENCES sales_campaigns(campaign_id),
+    FOREIGN KEY (account_id) REFERENCES sales_accounts(account_id),
+    FOREIGN KEY (contact_id) REFERENCES sales_contacts(contact_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_account_contact ON sales_campaign_enrolments(campaign_id, account_id, contact_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_enrolment_status ON sales_campaign_enrolments(status);
+
+CREATE TABLE IF NOT EXISTS sales_campaign_actions (
+    action_id TEXT PRIMARY KEY,
+    enrolment_id TEXT NOT NULL,
+    step_id TEXT NOT NULL,
+    due_at TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'Due',
+    completed_at TEXT,
+    outcome TEXT,
+    created_at TEXT NOT NULL,
+    FOREIGN KEY (enrolment_id) REFERENCES sales_campaign_enrolments(enrolment_id),
+    FOREIGN KEY (step_id) REFERENCES sales_campaign_steps(step_id)
+);
+CREATE UNIQUE INDEX IF NOT EXISTS idx_campaign_action_step ON sales_campaign_actions(enrolment_id, step_id);
+CREATE INDEX IF NOT EXISTS idx_campaign_actions_due ON sales_campaign_actions(status, due_at);
+
 CREATE TABLE IF NOT EXISTS sales_tasks (
     task_id TEXT PRIMARY KEY,
     account_id TEXT NOT NULL,
@@ -223,6 +278,10 @@ ALTER TABLE sales_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_contacts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_contact_candidates ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_activities ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_campaigns ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_campaign_steps ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_campaign_enrolments ENABLE ROW LEVEL SECURITY;
+ALTER TABLE sales_campaign_actions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_tasks ENABLE ROW LEVEL SECURITY;
 ALTER TABLE sales_suppressions ENABLE ROW LEVEL SECURITY;
 ALTER TABLE cqc_sync_runs ENABLE ROW LEVEL SECURITY;
