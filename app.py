@@ -826,10 +826,11 @@ def admin_sales_account(account_id):
     account = _sales_account_or_404(account_id)
     db = get_db()
     contacts = db.execute("SELECT * FROM sales_contacts WHERE account_id=? ORDER BY is_decision_maker DESC, created_at DESC", (account_id,)).fetchall()
+    opportunity = db.execute("SELECT * FROM sales_opportunities WHERE account_id=?", (account_id,)).fetchone()
     candidates = db.execute("SELECT * FROM sales_contact_candidates WHERE account_id=? AND status=? ORDER BY first_found_at DESC", (account_id, "Review")).fetchall()
     activities = db.execute("SELECT * FROM sales_activities WHERE account_id=? ORDER BY occurred_at DESC LIMIT 100", (account_id,)).fetchall()
     tasks = db.execute("SELECT * FROM sales_tasks WHERE account_id=? ORDER BY CASE status WHEN 'Open' THEN 0 ELSE 1 END, due_at, created_at DESC", (account_id,)).fetchall()
-    return render_template("admin_sales_account.html", account=account, contacts=contacts, candidates=candidates, activities=activities,
+    return render_template("admin_sales_account.html", account=account, opportunity=opportunity, contacts=contacts, candidates=candidates, activities=activities,
                            tasks=tasks, stages=SALES_STAGES, statuses=SALES_STATUSES)
 
 
@@ -847,6 +848,58 @@ def admin_sales_account_update(account_id):
     db = get_db()
     db.execute("UPDATE sales_accounts SET owner=?, lifecycle_stage=?, sales_status=?, updated_at=? WHERE account_id=?",
                (owner, stage, status, now_iso(), account_id))
+    db.commit()
+    return redirect(url_for("admin_sales_account", account_id=account_id))
+
+
+@app.post("/admin/sales/accounts/<account_id>/commercial")
+@admin_required
+def admin_sales_commercial_update(account_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    _sales_account_or_404(account_id)
+    def money(name):
+        raw = clean(request.form.get(name), 30)
+        if not raw:
+            return None
+        try:
+            value = round(float(raw), 2)
+        except ValueError:
+            abort(400)
+        if value < 0:
+            abort(400)
+        return value
+    try:
+        probability = int(request.form.get("probability", "0"))
+    except ValueError:
+        abort(400)
+    if probability < 0 or probability > 100:
+        abort(400)
+    status = clean(request.form.get("commercial_status"), 30)
+    if status not in ("Open", "Proposal", "Negotiation", "Won", "Lost"):
+        abort(400)
+    db = get_db()
+    existing = db.execute("SELECT opportunity_id FROM sales_opportunities WHERE account_id=?", (account_id,)).fetchone()
+    oid = existing["opportunity_id"] if existing else str(uuid.uuid4())
+    now = now_iso()
+    db.execute("""INSERT INTO sales_opportunities
+        (opportunity_id, account_id, proposal_value, monthly_license, setup_fee, probability,
+         expected_close_date, contract_start_date, commercial_status, won_lost_reason, notes, created_at, updated_at)
+        VALUES (?,?,?,?,?,?,?,?,?,?,?,?,?)
+        ON CONFLICT(account_id) DO UPDATE SET proposal_value=excluded.proposal_value,
+        monthly_license=excluded.monthly_license, setup_fee=excluded.setup_fee, probability=excluded.probability,
+        expected_close_date=excluded.expected_close_date, contract_start_date=excluded.contract_start_date,
+        commercial_status=excluded.commercial_status, won_lost_reason=excluded.won_lost_reason,
+        notes=excluded.notes, updated_at=excluded.updated_at""",
+        (oid, account_id, money("proposal_value"), money("monthly_license"), money("setup_fee"), probability,
+         clean(request.form.get("expected_close_date"), 20) or None,
+         clean(request.form.get("contract_start_date"), 20) or None, status,
+         clean(request.form.get("won_lost_reason"), 300) or None, clean(request.form.get("commercial_notes"), 2000) or None,
+         now, now))
+    if status == "Won":
+        db.execute("UPDATE sales_accounts SET lifecycle_stage='Customer', sales_status='Won', updated_at=? WHERE account_id=?", (now, account_id))
+    elif status == "Lost":
+        db.execute("UPDATE sales_accounts SET lifecycle_stage='Closed', sales_status='Lost', updated_at=? WHERE account_id=?", (now, account_id))
     db.commit()
     return redirect(url_for("admin_sales_account", account_id=account_id))
 
