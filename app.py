@@ -660,7 +660,6 @@ def admin_cqc_sync():
     else:
         args.extend(["--limit", "100"])
     subprocess.Popen(args, cwd=str(BASE_DIR), env=os.environ.copy(),
-                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
                      start_new_session=True)
     return redirect(url_for("admin_cqc_prospects", sync="started"))
 
