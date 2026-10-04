@@ -2,17 +2,7 @@
 {% block title %}Marketing › Leads | Veridyn Recruit Admin{% endblock %}
 {% block meta %}<meta name="robots" content="noindex">{% endblock %}
 {% block body_class %}page-admin{% endblock %}
-{% block header %}
-<header class="site-header site-header--admin">
-  <div class="container container--wide site-header__inner">
-    <a href="/admin/marketing/leads">{{ logo(true) }}</a>
-    <nav class="site-nav" aria-label="Admin">
-      <span class="site-nav__crumb">Platform Admin › Marketing › <strong>Leads</strong></span>
-      <form method="post" action="/admin/logout"><button class="btn btn--ghost btn--sm" type="submit">Log out</button></form>
-    </nav>
-  </div>
-</header>
-{% endblock %}
+{% block header %}<header class="site-header site-header--admin"><div class="container container--wide site-header__inner"><a href="/admin/sales/dashboard">{{ logo(true) }}</a><nav class="site-nav" aria-label="Admin"><a class="site-nav__link" href="/admin/marketing/leads">Leads</a><a class="site-nav__link" href="/admin/sales/dashboard">Command Centre</a><a class="site-nav__link" href="/admin/sales/work-queue">Work Queue</a><a class="site-nav__link" href="/admin/sales/cqc-prospects">CQC Prospects</a><a class="site-nav__link" href="/admin/sales/campaigns">Campaigns</a><form method="post" action="/admin/logout"><button class="btn btn--ghost btn--sm" type="submit">Log out</button></form></nav></div></header>{% endblock %}
 {% block footer %}{% endblock %}
 {% block content %}
 <section class="admin">
