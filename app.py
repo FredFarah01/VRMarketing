@@ -17,6 +17,7 @@ from flask import (Flask, Response, abort, g, jsonify, redirect, render_template
                    request, send_file, session, url_for)
 
 from checklist_pdf import build_checklist_pdf
+from cqc_sales_schema import CQC_SALES_MIGRATION, CQC_SALES_PG_MIGRATION
 
 BASE_DIR = Path(__file__).resolve().parent
 load_dotenv(BASE_DIR / ".env")
