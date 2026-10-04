@@ -681,6 +681,58 @@ def _sales_account_or_404(account_id):
     return row
 
 
+@app.get("/admin/sales/dashboard")
+@admin_required
+def admin_sales_dashboard():
+    db = get_db()
+    scalar = lambda sql, params=(): db.execute(sql, params).fetchone()[0]
+    accounts = scalar("SELECT COUNT(*) FROM sales_accounts")
+    contacts = scalar("SELECT COUNT(*) FROM sales_contacts WHERE do_not_contact=0")
+    contacted_accounts = scalar("SELECT COUNT(*) FROM sales_accounts WHERE last_contacted_at IS NOT NULL")
+    demos = scalar("SELECT COUNT(*) FROM sales_accounts WHERE lifecycle_stage='Demo' OR sales_status='Demo Booked'")
+    trials = scalar("SELECT COUNT(*) FROM sales_accounts WHERE lifecycle_stage='Trial'")
+    customers = scalar("SELECT COUNT(*) FROM sales_accounts WHERE lifecycle_stage='Customer' OR sales_status='Won'")
+    m = {
+        "accounts": accounts,
+        "a1": scalar("SELECT COUNT(*) FROM sales_accounts WHERE priority='A1'"),
+        "a2": scalar("SELECT COUNT(*) FROM sales_accounts WHERE priority='A2'"),
+        "contacts": contacts,
+        "contact_coverage": round(100 * scalar("SELECT COUNT(DISTINCT account_id) FROM sales_contacts WHERE do_not_contact=0") / accounts, 1) if accounts else 0,
+        "activities": scalar("SELECT COUNT(*) FROM sales_activities"),
+        "demos": demos, "trials": trials, "customers": customers,
+        "customer_conversion": round(100 * customers / accounts, 2) if accounts else 0,
+    }
+    raw_pipeline = db.execute("SELECT lifecycle_stage, COUNT(*) FROM sales_accounts GROUP BY lifecycle_stage ORDER BY COUNT(*) DESC").fetchall()
+    pipeline = [{"stage": r[0], "count": r[1], "pct": round(100*r[1]/accounts, 1) if accounts else 0} for r in raw_pipeline]
+    priorities = [{"priority": r[0], "count": r[1]} for r in db.execute(
+        """SELECT priority, COUNT(*) FROM sales_accounts GROUP BY priority
+           ORDER BY CASE priority WHEN 'A1' THEN 1 WHEN 'A2' THEN 2 WHEN 'B' THEN 3 ELSE 4 END""").fetchall()]
+    segments = [{"segment": r[0] or "Unclassified", "count": r[1], "customers": r[2]} for r in db.execute(
+        """SELECT target_segment, COUNT(*), SUM(CASE WHEN lifecycle_stage='Customer' OR sales_status='Won' THEN 1 ELSE 0 END)
+           FROM sales_accounts GROUP BY target_segment ORDER BY COUNT(*) DESC""").fetchall()]
+    channels = [{"channel": r[0], "count": r[1]} for r in db.execute(
+        "SELECT activity_type, COUNT(*) FROM sales_activities GROUP BY activity_type ORDER BY COUNT(*) DESC").fetchall()]
+    owner_rows = db.execute("""SELECT COALESCE(a.owner,'') AS owner, COUNT(*) AS accounts,
+        SUM(CASE WHEN a.priority IN ('A1','A2') THEN 1 ELSE 0 END) AS top_accounts,
+        SUM(CASE WHEN a.last_contacted_at IS NOT NULL THEN 1 ELSE 0 END) AS contacted,
+        SUM(CASE WHEN a.lifecycle_stage='Demo' OR a.sales_status='Demo Booked' THEN 1 ELSE 0 END) AS demos,
+        SUM(CASE WHEN a.lifecycle_stage='Customer' OR a.sales_status='Won' THEN 1 ELSE 0 END) AS customers,
+        (SELECT COUNT(*) FROM sales_tasks t WHERE t.assigned_to=a.owner AND t.status='Open') AS open_tasks
+        FROM sales_accounts a WHERE COALESCE(a.owner,'') <> '' GROUP BY a.owner ORDER BY customers DESC, contacted DESC""").fetchall()
+    owners = [{"owner": r[0], "accounts": r[1], "top_accounts": r[2], "contacted": r[3],
+               "demos": r[4], "customers": r[5], "open_tasks": r[6]} for r in owner_rows]
+    campaign_rows = db.execute("""SELECT c.name,
+        (SELECT COUNT(*) FROM sales_campaign_enrolments e WHERE e.campaign_id=c.campaign_id),
+        (SELECT COUNT(*) FROM sales_campaign_actions x JOIN sales_campaign_enrolments e ON e.enrolment_id=x.enrolment_id WHERE e.campaign_id=c.campaign_id AND x.status='Due'),
+        (SELECT COUNT(*) FROM sales_campaign_actions x JOIN sales_campaign_enrolments e ON e.enrolment_id=x.enrolment_id WHERE e.campaign_id=c.campaign_id AND x.status='Completed'),
+        (SELECT COUNT(*) FROM sales_campaign_actions x JOIN sales_campaign_enrolments e ON e.enrolment_id=x.enrolment_id WHERE e.campaign_id=c.campaign_id)
+        FROM sales_campaigns c ORDER BY c.created_at DESC""").fetchall()
+    campaigns = [{"name": r[0], "enrolled": r[1], "due": r[2], "completed": r[3],
+                  "completion": round(100*r[3]/r[4], 1) if r[4] else 0} for r in campaign_rows]
+    return render_template("admin_sales_dashboard.html", m=m, pipeline=pipeline, priorities=priorities,
+                           segments=segments, channels=channels, owners=owners, campaigns=campaigns)
+
+
 @app.get("/admin/sales/work-queue")
 @admin_required
 def admin_sales_queue():
