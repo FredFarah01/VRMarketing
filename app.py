@@ -709,6 +709,65 @@ def admin_sales_queue():
     return render_template("admin_sales_queue.html", accounts=accounts, metrics=metrics, owner=owner, priority=priority)
 
 
+@app.get("/admin/sales/campaigns")
+@admin_required
+def admin_sales_campaigns():
+    db = get_db()
+    campaigns = db.execute("""SELECT c.*,
+        (SELECT COUNT(*) FROM sales_campaign_enrolments e WHERE e.campaign_id=c.campaign_id) AS enrolled,
+        (SELECT COUNT(*) FROM sales_campaign_actions a JOIN sales_campaign_enrolments e ON e.enrolment_id=a.enrolment_id
+         WHERE e.campaign_id=c.campaign_id AND a.status='Due') AS due_actions,
+        (SELECT COUNT(*) FROM sales_campaign_actions a JOIN sales_campaign_enrolments e ON e.enrolment_id=a.enrolment_id
+         WHERE e.campaign_id=c.campaign_id AND a.status='Completed') AS completed_actions
+        FROM sales_campaigns c ORDER BY c.created_at DESC""").fetchall()
+    actions = db.execute("""SELECT a.*, s.channel, s.subject_template, s.task_title,
+        ac.account_id, ac.company_name, ac.priority, ac.target_segment, ct.email, ct.phone
+        FROM sales_campaign_actions a
+        JOIN sales_campaign_enrolments e ON e.enrolment_id=a.enrolment_id
+        JOIN sales_campaign_steps s ON s.step_id=a.step_id
+        JOIN sales_accounts ac ON ac.account_id=e.account_id
+        LEFT JOIN sales_contacts ct ON ct.contact_id=e.contact_id
+        WHERE a.status='Due' AND a.due_at <= ?
+        ORDER BY a.due_at, CASE ac.priority WHEN 'A1' THEN 1 WHEN 'A2' THEN 2 WHEN 'B' THEN 3 ELSE 4 END
+        LIMIT 200""", (now_iso(),)).fetchall()
+    return render_template("admin_sales_campaigns.html", campaigns=campaigns, actions=actions)
+
+
+@app.post("/admin/sales/campaign-actions/<action_id>/complete")
+@admin_required
+def admin_sales_campaign_action_complete(action_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    db = get_db()
+    action = db.execute("""SELECT a.*, e.account_id, e.enrolment_id, s.channel, s.step_number
+        FROM sales_campaign_actions a
+        JOIN sales_campaign_enrolments e ON e.enrolment_id=a.enrolment_id
+        JOIN sales_campaign_steps s ON s.step_id=a.step_id WHERE a.action_id=?""", (action_id,)).fetchone()
+    if not action or action["status"] != "Due":
+        abort(404)
+    outcome = clean(request.form.get("outcome"), 160) or "Completed"
+    now = now_iso()
+    db.execute("UPDATE sales_campaign_actions SET status='Completed', completed_at=?, outcome=? WHERE action_id=?",
+               (now, outcome, action_id))
+    db.execute("""INSERT INTO sales_activities
+        (activity_id, account_id, activity_type, direction, outcome, notes, occurred_at, created_by)
+        VALUES (?,?,?,'Outbound',?,?,?,?)""",
+        (str(uuid.uuid4()), action["account_id"], action["channel"], outcome,
+         "Completed from campaign sequence.", now, ADMIN_USER))
+    db.execute("UPDATE sales_accounts SET last_contacted_at=?, updated_at=? WHERE account_id=?",
+               (now, now, action["account_id"]))
+    remaining = db.execute("SELECT COUNT(*) FROM sales_campaign_actions WHERE enrolment_id=? AND status='Due'",
+                           (action["enrolment_id"],)).fetchone()[0]
+    if remaining == 0:
+        db.execute("UPDATE sales_campaign_enrolments SET status='Completed', completed_at=? WHERE enrolment_id=?",
+                   (now, action["enrolment_id"]))
+    else:
+        db.execute("UPDATE sales_campaign_enrolments SET current_step=? WHERE enrolment_id=?",
+                   (action["step_number"] + 1, action["enrolment_id"]))
+    db.commit()
+    return redirect(url_for("admin_sales_campaigns"))
+
+
 @app.get("/admin/sales/accounts/<account_id>")
 @admin_required
 def admin_sales_account(account_id):
