@@ -613,13 +613,16 @@ def filtered_cqc_prospects():
     pages = max(1, (total + per_page - 1) // per_page)
     page = min(page, pages)
     offset = (page - 1) * per_page
+    aggregate = "STRING_AGG(DISTINCT {col}, ', ')" if USE_PG else "GROUP_CONCAT(DISTINCT {col})"
+    service_agg = aggregate.format(col="st.service_type_name")
+    rating_agg = aggregate.format(col="r.overall_rating")
     rows = db.execute(f"""
         SELECT p.*,
           (SELECT COUNT(*) FROM cqc_locations l WHERE l.provider_id=p.provider_id) AS location_count,
-          (SELECT GROUP_CONCAT(DISTINCT st.service_type_name) FROM cqc_locations l
+          (SELECT {service_agg} FROM cqc_locations l
              JOIN cqc_location_service_types st ON st.location_id=l.location_id
              WHERE l.provider_id=p.provider_id) AS service_types,
-          (SELECT GROUP_CONCAT(DISTINCT r.overall_rating) FROM cqc_locations r
+          (SELECT {rating_agg} FROM cqc_locations r
              WHERE r.provider_id=p.provider_id AND r.overall_rating IS NOT NULL) AS ratings,
           a.account_id, a.account_score, a.priority, a.sales_status
         FROM cqc_providers p
