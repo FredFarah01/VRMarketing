@@ -560,6 +560,104 @@ def admin_leads():
                            roles=JOB_ROLES, sizes=ORG_SIZES, funnel=funnel, total=total)
 
 
+def filtered_cqc_prospects():
+    q = clean(request.args.get("q"), 120)
+    area = clean(request.args.get("area"), 80)
+    service = clean(request.args.get("service"), 120)
+    rating = clean(request.args.get("rating"), 40)
+    status = clean(request.args.get("status"), 60)
+    multi = clean(request.args.get("multi"), 10)
+    try:
+        page = max(1, int(request.args.get("page", "1")))
+    except ValueError:
+        page = 1
+    per_page = 50
+    like = "ILIKE" if USE_PG else "LIKE"
+    where = ["1=1"]
+    params = []
+    if q:
+        where.append(f"""(p.provider_name {like} ? OR EXISTS (
+            SELECT 1 FROM cqc_locations ql WHERE ql.provider_id=p.provider_id AND ql.location_name {like} ?
+        ))""")
+        params += [f"%{q}%", f"%{q}%"]
+    if area:
+        where.append(f"""(COALESCE(p.postcode,'') {like} ? OR COALESCE(p.town_city,'') {like} ?
+            OR COALESCE(p.county,'') {like} ? OR EXISTS (
+              SELECT 1 FROM cqc_locations al WHERE al.provider_id=p.provider_id
+              AND (COALESCE(al.postcode,'') {like} ? OR COALESCE(al.town_city,'') {like} ?
+                   OR COALESCE(al.county,'') {like} ?)
+            ))""")
+        params += [f"%{area}%"] * 6
+    if service:
+        where.append("""EXISTS (SELECT 1 FROM cqc_locations sl
+            JOIN cqc_location_service_types st ON st.location_id=sl.location_id
+            WHERE sl.provider_id=p.provider_id AND st.service_type_name=?)""")
+        params.append(service)
+    if rating:
+        where.append("EXISTS (SELECT 1 FROM cqc_locations rl WHERE rl.provider_id=p.provider_id AND rl.overall_rating=?)")
+        params.append(rating)
+    if status:
+        where.append("p.registration_status=?")
+        params.append(status)
+    try:
+        min_locations = int(multi) if multi else 0
+    except ValueError:
+        min_locations = 0
+    if min_locations:
+        where.append("(SELECT COUNT(*) FROM cqc_locations ml WHERE ml.provider_id=p.provider_id) >= ?")
+        params.append(min_locations)
+
+    where_sql = " AND ".join(where)
+    db = get_db()
+    total = db.execute(f"SELECT COUNT(*) FROM cqc_providers p WHERE {where_sql}", params).fetchone()[0]
+    pages = max(1, (total + per_page - 1) // per_page)
+    page = min(page, pages)
+    offset = (page - 1) * per_page
+    rows = db.execute(f"""
+        SELECT p.*,
+          (SELECT COUNT(*) FROM cqc_locations l WHERE l.provider_id=p.provider_id) AS location_count,
+          (SELECT GROUP_CONCAT(DISTINCT st.service_type_name) FROM cqc_locations l
+             JOIN cqc_location_service_types st ON st.location_id=l.location_id
+             WHERE l.provider_id=p.provider_id) AS service_types,
+          (SELECT GROUP_CONCAT(DISTINCT r.overall_rating) FROM cqc_locations r
+             WHERE r.provider_id=p.provider_id AND r.overall_rating IS NOT NULL) AS ratings,
+          a.account_id, a.account_score, a.priority, a.sales_status
+        FROM cqc_providers p
+        LEFT JOIN sales_accounts a ON a.provider_id=p.provider_id
+        WHERE {where_sql}
+        ORDER BY location_count DESC, p.provider_name
+        LIMIT ? OFFSET ?
+    """, params + [per_page, offset]).fetchall()
+    return rows, total, page, pages, dict(q=q, area=area, service=service, rating=rating, status=status, multi=multi)
+
+
+@app.get("/admin/sales/cqc-prospects")
+@admin_required
+def admin_cqc_prospects():
+    prospects, total, page, pages, filters = filtered_cqc_prospects()
+    db = get_db()
+    imported_total = db.execute("SELECT COUNT(*) FROM cqc_providers").fetchone()[0]
+    service_types = [r[0] for r in db.execute(
+        "SELECT DISTINCT service_type_name FROM cqc_location_service_types WHERE service_type_name IS NOT NULL ORDER BY service_type_name"
+    ).fetchall()]
+    ratings = [r[0] for r in db.execute(
+        "SELECT DISTINCT overall_rating FROM cqc_locations WHERE overall_rating IS NOT NULL ORDER BY overall_rating"
+    ).fetchall()]
+    registration_statuses = [r[0] for r in db.execute(
+        "SELECT DISTINCT registration_status FROM cqc_providers WHERE registration_status IS NOT NULL ORDER BY registration_status"
+    ).fetchall()]
+
+    def page_url(n):
+        args = request.args.to_dict()
+        args["page"] = str(n)
+        return url_for("admin_cqc_prospects", **args)
+
+    return render_template("admin_cqc_prospects.html", prospects=prospects, total=total,
+                           imported_total=imported_total, page=page, pages=pages, filters=filters,
+                           service_types=service_types, ratings=ratings,
+                           registration_statuses=registration_statuses, page_url=page_url)
+
+
 @app.post("/admin/marketing/leads/<lead_id>/status")
 @admin_required
 def admin_update_status(lead_id):
