@@ -83,3 +83,20 @@ python contact_enrichment.py --limit 25 --priority A1
 ```
 
 The worker scans only provider-owned public websites and stores discovered business emails/phones as review candidates with source evidence. It does not guess email patterns or mark discovered emails as verified. Review suggestions in the account workspace; Accept copies a non-duplicate candidate into `sales_contacts`, while Reject retains the candidate record with rejected status for audit history.
+
+
+### Manual-first outbound campaigns
+
+Create a 21-day multi-channel campaign:
+
+```
+python campaign_engine.py seed --name "Veridyn Recruit 21-Day Outreach"
+```
+
+Then enrol a controlled batch using the returned campaign ID:
+
+```
+python campaign_engine.py enrol CAMPAIGN_ID --priority A1 --limit 25
+```
+
+The engine creates Email, LinkedIn and Call actions but does not send messages. Enrolment skips do-not-contact contacts and matches in `sales_suppressions` by email, domain or CQC provider. Salespeople execute due actions from `/admin/sales/campaigns`; completing an action records it in CRM activity history.
