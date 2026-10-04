@@ -567,6 +567,8 @@ def filtered_cqc_prospects():
     rating = clean(request.args.get("rating"), 40)
     status = clean(request.args.get("status"), 60)
     multi = clean(request.args.get("multi"), 10)
+    segment = clean(request.args.get("segment"), 80)
+    priority = clean(request.args.get("priority"), 10)
     try:
         page = max(1, int(request.args.get("page", "1")))
     except ValueError:
@@ -606,6 +608,12 @@ def filtered_cqc_prospects():
     if min_locations:
         where.append("(SELECT COUNT(*) FROM cqc_locations ml WHERE ml.provider_id=p.provider_id) >= ?")
         params.append(min_locations)
+    if segment:
+        where.append("EXISTS (SELECT 1 FROM sales_accounts sa WHERE sa.provider_id=p.provider_id AND sa.target_segment=?)")
+        params.append(segment)
+    if priority:
+        where.append("EXISTS (SELECT 1 FROM sales_accounts sa WHERE sa.provider_id=p.provider_id AND sa.priority=?)")
+        params.append(priority)
 
     where_sql = " AND ".join(where)
     db = get_db()
@@ -624,14 +632,14 @@ def filtered_cqc_prospects():
              WHERE l.provider_id=p.provider_id) AS service_types,
           (SELECT {rating_agg} FROM cqc_locations r
              WHERE r.provider_id=p.provider_id AND r.overall_rating IS NOT NULL) AS ratings,
-          a.account_id, a.account_score, a.priority, a.sales_status
+          a.account_id, a.account_score, a.priority, a.sales_status, a.target_segment, a.score_reasons
         FROM cqc_providers p
         LEFT JOIN sales_accounts a ON a.provider_id=p.provider_id
         WHERE {where_sql}
         ORDER BY location_count DESC, p.provider_name
         LIMIT ? OFFSET ?
     """, params + [per_page, offset]).fetchall()
-    return rows, total, page, pages, dict(q=q, area=area, service=service, rating=rating, status=status, multi=multi)
+    return rows, total, page, pages, dict(q=q, area=area, service=service, rating=rating, status=status, multi=multi, segment=segment, priority=priority)
 
 
 @app.get("/admin/sales/cqc-prospects")
@@ -646,7 +654,7 @@ def admin_cqc_prospects():
     ratings = [r[0] for r in db.execute(
         "SELECT DISTINCT overall_rating FROM cqc_locations WHERE overall_rating IS NOT NULL ORDER BY overall_rating"
     ).fetchall()]
-    registration_statuses = [r[0] for r in db.execute(
+    segments = [r[0] for r in db.execute("SELECT DISTINCT target_segment FROM sales_accounts WHERE target_segment IS NOT NULL ORDER BY target_segment").fetchall()]\n    registration_statuses = [r[0] for r in db.execute(
         "SELECT DISTINCT registration_status FROM cqc_providers WHERE registration_status IS NOT NULL ORDER BY registration_status"
     ).fetchall()]
 
@@ -657,7 +665,7 @@ def admin_cqc_prospects():
 
     return render_template("admin_cqc_prospects.html", prospects=prospects, total=total,
                            imported_total=imported_total, page=page, pages=pages, filters=filters,
-                           service_types=service_types, ratings=ratings,
+                           service_types=service_types, ratings=ratings, segments=segments,
                            registration_statuses=registration_statuses, page_url=page_url)
 
 
