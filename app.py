@@ -670,6 +670,164 @@ def admin_cqc_prospects():
                            registration_statuses=registration_statuses, page_url=page_url)
 
 
+SALES_STAGES = ["Prospect", "Contacted", "Qualified", "Demo", "Trial", "Customer", "Closed"]
+SALES_STATUSES = ["Unworked", "Researching", "Attempting Contact", "Connected", "Follow-up", "Demo Booked", "Proposal", "Won", "Lost", "Do Not Contact"]
+
+
+def _sales_account_or_404(account_id):
+    row = get_db().execute("SELECT * FROM sales_accounts WHERE account_id=?", (account_id,)).fetchone()
+    if not row:
+        abort(404)
+    return row
+
+
+@app.get("/admin/sales/work-queue")
+@admin_required
+def admin_sales_queue():
+    owner = clean(request.args.get("owner"), 120)
+    priority = clean(request.args.get("priority"), 10)
+    sql = "SELECT * FROM sales_accounts WHERE 1=1"
+    params = []
+    if owner:
+        like = "ILIKE" if USE_PG else "LIKE"
+        sql += f" AND COALESCE(owner,'') {like} ?"
+        params.append(f"%{owner}%")
+    if priority in ("A1", "A2", "B", "C"):
+        sql += " AND priority=?"
+        params.append(priority)
+    sql += """ ORDER BY CASE priority WHEN 'A1' THEN 1 WHEN 'A2' THEN 2 WHEN 'B' THEN 3 ELSE 4 END,
+               CASE WHEN next_action_at IS NULL THEN 1 ELSE 0 END, next_action_at, account_score DESC LIMIT 250"""
+    db = get_db()
+    accounts = db.execute(sql, params).fetchall()
+    now = now_iso()
+    metrics = {
+        "a1": db.execute("SELECT COUNT(*) FROM sales_accounts WHERE priority='A1'").fetchone()[0],
+        "a2": db.execute("SELECT COUNT(*) FROM sales_accounts WHERE priority='A2'").fetchone()[0],
+        "open_tasks": db.execute("SELECT COUNT(*) FROM sales_tasks WHERE status='Open'").fetchone()[0],
+        "overdue": db.execute("SELECT COUNT(*) FROM sales_tasks WHERE status='Open' AND due_at IS NOT NULL AND due_at < ?", (now,)).fetchone()[0],
+    }
+    return render_template("admin_sales_queue.html", accounts=accounts, metrics=metrics, owner=owner, priority=priority)
+
+
+@app.get("/admin/sales/accounts/<account_id>")
+@admin_required
+def admin_sales_account(account_id):
+    account = _sales_account_or_404(account_id)
+    db = get_db()
+    contacts = db.execute("SELECT * FROM sales_contacts WHERE account_id=? ORDER BY is_decision_maker DESC, created_at DESC", (account_id,)).fetchall()
+    activities = db.execute("SELECT * FROM sales_activities WHERE account_id=? ORDER BY occurred_at DESC LIMIT 100", (account_id,)).fetchall()
+    tasks = db.execute("SELECT * FROM sales_tasks WHERE account_id=? ORDER BY CASE status WHEN 'Open' THEN 0 ELSE 1 END, due_at, created_at DESC", (account_id,)).fetchall()
+    return render_template("admin_sales_account.html", account=account, contacts=contacts, activities=activities,
+                           tasks=tasks, stages=SALES_STAGES, statuses=SALES_STATUSES)
+
+
+@app.post("/admin/sales/accounts/<account_id>/update")
+@admin_required
+def admin_sales_account_update(account_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    _sales_account_or_404(account_id)
+    owner = clean(request.form.get("owner"), 120) or None
+    stage = clean(request.form.get("lifecycle_stage"), 40)
+    status = clean(request.form.get("sales_status"), 40)
+    if stage not in SALES_STAGES or status not in SALES_STATUSES:
+        abort(400)
+    db = get_db()
+    db.execute("UPDATE sales_accounts SET owner=?, lifecycle_stage=?, sales_status=?, updated_at=? WHERE account_id=?",
+               (owner, stage, status, now_iso(), account_id))
+    db.commit()
+    return redirect(url_for("admin_sales_account", account_id=account_id))
+
+
+@app.post("/admin/sales/accounts/<account_id>/contacts")
+@admin_required
+def admin_sales_add_contact(account_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    _sales_account_or_404(account_id)
+    email = clean(request.form.get("email"), 254).lower() or None
+    if email and not EMAIL_RE.match(email):
+        abort(400)
+    db = get_db()
+    now = now_iso()
+    db.execute("""INSERT INTO sales_contacts
+        (contact_id, account_id, first_name, last_name, job_title, email, phone, source,
+         is_decision_maker, email_verified, do_not_contact, created_at, updated_at)
+        VALUES (?,?,?,?,?,?,?,'Manual',?,0,0,?,?)""",
+        (str(uuid.uuid4()), account_id, clean(request.form.get("first_name"), 80) or None,
+         clean(request.form.get("last_name"), 80) or None, clean(request.form.get("job_title"), 120) or None,
+         email, clean(request.form.get("phone"), 60) or None, int(request.form.get("is_decision_maker") == "1"), now, now))
+    db.commit()
+    return redirect(url_for("admin_sales_account", account_id=account_id))
+
+
+@app.post("/admin/sales/accounts/<account_id>/activities")
+@admin_required
+def admin_sales_add_activity(account_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    _sales_account_or_404(account_id)
+    activity_type = clean(request.form.get("activity_type"), 40)
+    if activity_type not in ("Call", "Email", "LinkedIn", "Meeting", "Demo", "Note"):
+        abort(400)
+    now = now_iso()
+    db = get_db()
+    db.execute("""INSERT INTO sales_activities
+        (activity_id, account_id, activity_type, direction, outcome, notes, occurred_at, created_by)
+        VALUES (?,?,?,'Outbound',?,?,?,?)""",
+        (str(uuid.uuid4()), account_id, activity_type, clean(request.form.get("outcome"), 160) or None,
+         clean(request.form.get("notes"), 2000) or None, now, ADMIN_USER))
+    db.execute("UPDATE sales_accounts SET last_contacted_at=?, sales_status=CASE WHEN sales_status='Unworked' THEN 'Attempting Contact' ELSE sales_status END, updated_at=? WHERE account_id=?",
+               (now, now, account_id))
+    db.commit()
+    return redirect(url_for("admin_sales_account", account_id=account_id))
+
+
+def _refresh_next_action(db, account_id):
+    row = db.execute("""SELECT title, due_at FROM sales_tasks WHERE account_id=? AND status='Open'
+                        ORDER BY CASE WHEN due_at IS NULL THEN 1 ELSE 0 END, due_at, created_at LIMIT 1""",
+                     (account_id,)).fetchone()
+    db.execute("UPDATE sales_accounts SET next_action=?, next_action_at=?, updated_at=? WHERE account_id=?",
+               ((row["title"] if row else None), (row["due_at"] if row else None), now_iso(), account_id))
+
+
+@app.post("/admin/sales/accounts/<account_id>/tasks")
+@admin_required
+def admin_sales_add_task(account_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    _sales_account_or_404(account_id)
+    title = clean(request.form.get("title"), 180)
+    task_type = clean(request.form.get("task_type"), 40)
+    if not title or task_type not in ("Call", "Email", "LinkedIn", "Demo", "Follow-up", "Research"):
+        abort(400)
+    due_at = clean(request.form.get("due_at"), 40) or None
+    db = get_db()
+    db.execute("""INSERT INTO sales_tasks
+        (task_id, account_id, assigned_to, task_type, title, due_at, status, priority, created_at)
+        VALUES (?,?,?,?,?,?,'Open','Normal',?)""",
+        (str(uuid.uuid4()), account_id, clean(request.form.get("assigned_to"), 120) or None,
+         task_type, title, due_at, now_iso()))
+    _refresh_next_action(db, account_id)
+    db.commit()
+    return redirect(url_for("admin_sales_account", account_id=account_id))
+
+
+@app.post("/admin/sales/tasks/<task_id>/complete")
+@admin_required
+def admin_sales_complete_task(task_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    db = get_db()
+    task = db.execute("SELECT account_id FROM sales_tasks WHERE task_id=?", (task_id,)).fetchone()
+    if not task:
+        abort(404)
+    db.execute("UPDATE sales_tasks SET status='Completed', completed_at=? WHERE task_id=?", (now_iso(), task_id))
+    _refresh_next_action(db, task["account_id"])
+    db.commit()
+    return redirect(url_for("admin_sales_account", account_id=task["account_id"]))
+
+
 @app.post("/admin/marketing/leads/<lead_id>/status")
 @admin_required
 def admin_update_status(lead_id):
