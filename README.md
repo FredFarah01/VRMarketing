@@ -107,3 +107,10 @@ The engine creates Email, LinkedIn and Call actions but does not send messages. 
 Open `/admin/sales/dashboard` for management reporting across target accounts, A1/A2 priorities, contact coverage, CRM activities, demos, trials, customers, account-to-customer conversion, pipeline stage, segment performance, salesperson performance and campaign execution.
 
 Revenue/MRR is intentionally not inferred from list pricing. Add contract/subscription revenue fields before using this dashboard for financial attribution.
+
+
+### Commercial pipeline and revenue
+
+Each CRM account can store an explicit commercial opportunity: proposal value, monthly licence, setup fee, probability, expected close date, contract start date, commercial status and Won/Lost reason.
+
+The Command Centre derives open pipeline, probability-weighted pipeline, Won MRR, ARR and setup-fee revenue from these records. Revenue is counted only from opportunities marked Won; scoring/list pricing never creates revenue automatically.
