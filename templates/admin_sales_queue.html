@@ -1,0 +1,23 @@
+{% extends "base.html" %}
+{% block title %}Sales Work Queue | Veridyn Recruit Admin{% endblock %}
+{% block meta %}<meta name="robots" content="noindex">{% endblock %}
+{% block body_class %}page-admin{% endblock %}
+{% block header %}
+<header class="site-header site-header--admin"><div class="container container--wide site-header__inner">
+<a href="/admin/sales/work-queue">{{ logo(true) }}</a><nav class="site-nav" aria-label="Admin">
+<a class="site-nav__link" href="/admin/marketing/leads">Leads</a><a class="site-nav__link" href="/admin/sales/cqc-prospects">CQC Prospects</a>
+<span class="site-nav__crumb">Sales › <strong>Work Queue</strong></span>
+<form method="post" action="/admin/logout"><button class="btn btn--ghost btn--sm">Log out</button></form></nav></div></header>
+{% endblock %}{% block footer %}{% endblock %}
+{% block content %}<section class="admin"><div class="container container--wide">
+<div class="admin__head"><div><h1>Sales Work Queue</h1><p>Prioritised accounts and follow-ups for today.</p></div><a class="btn btn--primary btn--sm" href="/admin/sales/cqc-prospects">Find prospects</a></div>
+<div class="funnel crm-metrics">
+<div class="funnel__step"><span>A1 accounts</span><strong>{{ metrics.a1 }}</strong></div>
+<div class="funnel__step"><span>A2 accounts</span><strong>{{ metrics.a2 }}</strong></div>
+<div class="funnel__step"><span>Open tasks</span><strong>{{ metrics.open_tasks }}</strong></div>
+<div class="funnel__step"><span>Overdue</span><strong>{{ metrics.overdue }}</strong></div>
+</div>
+<form class="filters" method="get"><input name="owner" value="{{ owner }}" placeholder="Sales owner"><select name="priority"><option value="">All priorities</option>{% for p in ['A1','A2','B','C'] %}<option {{ 'selected' if priority==p }}>{{ p }}</option>{% endfor %}</select><button class="btn btn--primary btn--sm">Filter</button><a class="text-link" href="/admin/sales/work-queue">Reset</a></form>
+<div class="table-scroll card"><table class="admin-table"><thead><tr><th>Priority</th><th>Account</th><th>Segment</th><th>Owner</th><th>Stage</th><th>Next action</th><th>Last contacted</th></tr></thead><tbody>
+{% for a in accounts %}<tr><td><span class="pill pill--{{ 'red' if a.priority=='A1' else 'amber' if a.priority=='A2' else 'slate' }}">{{ a.priority }} · {{ a.account_score }}</span></td><td><a href="/admin/sales/accounts/{{ a.account_id }}"><strong>{{ a.company_name }}</strong></a><br><small>{{ a.location_count }} locations</small></td><td>{{ a.target_segment or '—' }}</td><td>{{ a.owner or 'Unassigned' }}</td><td>{{ a.lifecycle_stage }}<br><small>{{ a.sales_status }}</small></td><td>{{ a.next_action or 'No task scheduled' }}{% if a.next_action_at %}<br><small>{{ a.next_action_at[:16] }}</small>{% endif %}</td><td>{{ a.last_contacted_at[:16] if a.last_contacted_at else 'Never' }}</td></tr>{% else %}<tr><td colspan="7" class="empty">No accounts match this work queue.</td></tr>{% endfor %}
+</tbody></table></div></div></section>{% endblock %}
