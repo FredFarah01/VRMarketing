@@ -29,3 +29,27 @@ Supabase's public API keys.
 
 Data is stored in `marketing_*` tables, kept separate from candidate records.
 Lead scoring rules live in `SCORING_RULES` in `app.py`; scores are internal only.
+
+
+## CQC sales platform branch
+
+The `feature/cqc-sales-platform` branch adds a separate account-intelligence layer. Imported CQC organisations are stored in `cqc_*` and `sales_*` tables and are not treated as consented inbound `marketing_leads`.
+
+### CQC API sync
+
+Create/access a CQC Syndication API subscription in the CQC Developer Portal, then set `CQC_API_KEY` in `.env`. The importer is manual by design and does not run when Flask starts.
+
+Safe first test:
+
+```
+python cqc_sync.py --limit 10 --dry-run
+python cqc_sync.py --limit 10
+```
+
+Only after validating the imported records:
+
+```
+python cqc_sync.py --full
+```
+
+The sync imports providers first, then locations, retains the raw API payload for traceability, normalises service types/specialisms/regulated activities, and records each run in `cqc_sync_runs`. Never commit the CQC API key.
