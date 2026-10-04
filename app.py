@@ -715,9 +715,10 @@ def admin_sales_account(account_id):
     account = _sales_account_or_404(account_id)
     db = get_db()
     contacts = db.execute("SELECT * FROM sales_contacts WHERE account_id=? ORDER BY is_decision_maker DESC, created_at DESC", (account_id,)).fetchall()
+    candidates = db.execute("SELECT * FROM sales_contact_candidates WHERE account_id=? AND status=? ORDER BY first_found_at DESC", (account_id, "Review")).fetchall()
     activities = db.execute("SELECT * FROM sales_activities WHERE account_id=? ORDER BY occurred_at DESC LIMIT 100", (account_id,)).fetchall()
     tasks = db.execute("SELECT * FROM sales_tasks WHERE account_id=? ORDER BY CASE status WHEN 'Open' THEN 0 ELSE 1 END, due_at, created_at DESC", (account_id,)).fetchall()
-    return render_template("admin_sales_account.html", account=account, contacts=contacts, activities=activities,
+    return render_template("admin_sales_account.html", account=account, contacts=contacts, candidates=candidates, activities=activities,
                            tasks=tasks, stages=SALES_STAGES, statuses=SALES_STATUSES)
 
 
