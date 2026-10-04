@@ -72,3 +72,14 @@ Priority bands: A1 = 80+, A2 = 60–79, B = 40–59, C = below 40. The score use
 After importing and scoring providers, open `/admin/sales/work-queue`. The queue prioritises A1/A2 accounts and upcoming actions. Each scored provider has an account workspace for sales ownership, lifecycle/status, manual contacts, outbound activity notes and follow-up tasks. All CRM writes require the existing admin session and CSRF token.
 
 Recommended operator flow: CQC Prospects → scored account → assign owner → add decision-maker → log call/email/LinkedIn activity → schedule next task → work from the queue each day.
+
+
+### Public contact enrichment
+
+Run a small batch first:
+
+```
+python contact_enrichment.py --limit 25 --priority A1
+```
+
+The worker scans only provider-owned public websites and stores discovered business emails/phones as review candidates with source evidence. It does not guess email patterns or mark discovered emails as verified. Review suggestions in the account workspace; Accept copies a non-duplicate candidate into `sales_contacts`, while Reject retains the candidate record with rejected status for audit history.
