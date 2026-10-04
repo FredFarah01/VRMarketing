@@ -100,3 +100,10 @@ python campaign_engine.py enrol CAMPAIGN_ID --priority A1 --limit 25
 ```
 
 The engine creates Email, LinkedIn and Call actions but does not send messages. Enrolment skips do-not-contact contacts and matches in `sales_suppressions` by email, domain or CQC provider. Salespeople execute due actions from `/admin/sales/campaigns`; completing an action records it in CRM activity history.
+
+
+### Sales Command Centre
+
+Open `/admin/sales/dashboard` for management reporting across target accounts, A1/A2 priorities, contact coverage, CRM activities, demos, trials, customers, account-to-customer conversion, pipeline stage, segment performance, salesperson performance and campaign execution.
+
+Revenue/MRR is intentionally not inferred from list pricing. Add contract/subscription revenue fields before using this dashboard for financial attribution.
