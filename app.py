@@ -9,7 +9,7 @@ import sys
 import time
 import uuid
 from collections import defaultdict, deque
-from datetime import datetime, timezone
+from datetime import datetime, timezone, timedelta
 from functools import wraps
 from pathlib import Path
 
@@ -650,9 +650,22 @@ def admin_cqc_sync():
     if not check_csrf(request.form.get("csrf_token", "")):
         abort(400)
     db = get_db()
-    running = db.execute("SELECT sync_id FROM cqc_sync_runs WHERE status='Running' ORDER BY started_at DESC LIMIT 1").fetchone()
+    running = db.execute("SELECT sync_id, started_at FROM cqc_sync_runs WHERE status='Running' ORDER BY started_at DESC LIMIT 1").fetchone()
     if running:
-        return redirect(url_for("admin_cqc_prospects", sync="running"))
+        try:
+            started = datetime.fromisoformat(str(running["started_at"]).replace("Z", "+00:00"))
+            if started.tzinfo is None:
+                started = started.replace(tzinfo=timezone.utc)
+            stale = datetime.now(timezone.utc) - started > timedelta(minutes=15)
+        except (TypeError, ValueError):
+            stale = True
+        if stale:
+            db.execute("""UPDATE cqc_sync_runs SET status='Failed', completed_at=?, error_message=?
+                          WHERE sync_id=? AND status='Running'""",
+                       (now_iso(), "Sync worker was interrupted or exceeded 15 minutes; safe to retry.", running["sync_id"]))
+            db.commit()
+        else:
+            return redirect(url_for("admin_cqc_prospects", sync="running"))
     mode = clean(request.form.get("mode"), 20)
     args = [sys.executable, str(BASE_DIR / "cqc_admin_sync.py")]
     if mode == "full":
@@ -674,6 +687,15 @@ def admin_cqc_prospects():
     latest_sync = db.execute("""SELECT sync_id, sync_type, status, started_at, completed_at,
         providers_seen, locations_seen, records_changed, error_message
         FROM cqc_sync_runs ORDER BY started_at DESC LIMIT 1""").fetchone()
+    sync_is_running = False
+    if latest_sync and latest_sync["status"] == "Running":
+        try:
+            sync_started = datetime.fromisoformat(str(latest_sync["started_at"]).replace("Z", "+00:00"))
+            if sync_started.tzinfo is None:
+                sync_started = sync_started.replace(tzinfo=timezone.utc)
+            sync_is_running = datetime.now(timezone.utc) - sync_started <= timedelta(minutes=15)
+        except (TypeError, ValueError):
+            sync_is_running = False
     service_types = [r[0] for r in db.execute(
         "SELECT DISTINCT service_type_name FROM cqc_location_service_types WHERE service_type_name IS NOT NULL ORDER BY service_type_name"
     ).fetchall()]
@@ -695,7 +717,7 @@ def admin_cqc_prospects():
                            service_types=service_types, ratings=ratings, segments=segments,
                            registration_statuses=registration_statuses, page_url=page_url,
                            imported_locations=imported_locations, latest_sync=latest_sync,
-                           sync_notice=request.args.get("sync"))
+                           sync_is_running=sync_is_running, sync_notice=request.args.get("sync"))
 
 
 SALES_STAGES = ["Prospect", "Contacted", "Qualified", "Demo", "Trial", "Customer", "Closed"]
