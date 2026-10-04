@@ -762,6 +762,38 @@ def admin_sales_add_contact(account_id):
     return redirect(url_for("admin_sales_account", account_id=account_id))
 
 
+@app.post("/admin/sales/contact-candidates/<candidate_id>/review")
+@admin_required
+def admin_sales_review_candidate(candidate_id):
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    action = request.form.get("action", "")
+    if action not in ("accept", "reject"):
+        abort(400)
+    db = get_db()
+    candidate = db.execute("SELECT * FROM sales_contact_candidates WHERE candidate_id=?", (candidate_id,)).fetchone()
+    if not candidate or candidate["status"] != "Review":
+        abort(404)
+    if action == "accept":
+        duplicate = db.execute(
+            "SELECT contact_id FROM sales_contacts WHERE account_id=? AND COALESCE(email,'')=? AND COALESCE(phone,'')=?",
+            (candidate["account_id"], candidate["email"] or "", candidate["phone"] or "")
+        ).fetchone()
+        if not duplicate:
+            now = now_iso()
+            db.execute("""INSERT INTO sales_contacts
+                (contact_id, account_id, email, phone, source, source_url, is_decision_maker,
+                 email_verified, do_not_contact, created_at, updated_at)
+                VALUES (?,?,?,?,?,?,0,0,0,?,?)""",
+                (str(uuid.uuid4()), candidate["account_id"], candidate["email"], candidate["phone"],
+                 "Provider website", candidate["source_url"], now, now))
+        db.execute("UPDATE sales_contact_candidates SET status='Accepted' WHERE candidate_id=?", (candidate_id,))
+    else:
+        db.execute("UPDATE sales_contact_candidates SET status='Rejected' WHERE candidate_id=?", (candidate_id,))
+    db.commit()
+    return redirect(url_for("admin_sales_account", account_id=candidate["account_id"]))
+
+
 @app.post("/admin/sales/accounts/<account_id>/activities")
 @admin_required
 def admin_sales_add_activity(account_id):
