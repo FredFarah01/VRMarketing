@@ -692,7 +692,13 @@ def admin_sales_dashboard():
     demos = scalar("SELECT COUNT(*) FROM sales_accounts WHERE lifecycle_stage='Demo' OR sales_status='Demo Booked'")
     trials = scalar("SELECT COUNT(*) FROM sales_accounts WHERE lifecycle_stage='Trial'")
     customers = scalar("SELECT COUNT(*) FROM sales_accounts WHERE lifecycle_stage='Customer' OR sales_status='Won'")
+    open_pipeline = scalar("SELECT COALESCE(SUM(COALESCE(proposal_value,0)),0) FROM sales_opportunities WHERE commercial_status NOT IN ('Won','Lost')")
+    weighted_pipeline = scalar("SELECT COALESCE(SUM(COALESCE(proposal_value,0) * probability / 100.0),0) FROM sales_opportunities WHERE commercial_status NOT IN ('Won','Lost')")
+    mrr = scalar("SELECT COALESCE(SUM(COALESCE(monthly_license,0)),0) FROM sales_opportunities WHERE commercial_status='Won'")
+    setup_revenue = scalar("SELECT COALESCE(SUM(COALESCE(setup_fee,0)),0) FROM sales_opportunities WHERE commercial_status='Won'")
     m = {
+        "open_pipeline": round(open_pipeline, 2), "weighted_pipeline": round(weighted_pipeline, 2),
+        "mrr": round(mrr, 2), "arr": round(mrr * 12, 2), "setup_revenue": round(setup_revenue, 2),
         "accounts": accounts,
         "a1": scalar("SELECT COUNT(*) FROM sales_accounts WHERE priority='A1'"),
         "a2": scalar("SELECT COUNT(*) FROM sales_accounts WHERE priority='A2'"),
@@ -717,10 +723,11 @@ def admin_sales_dashboard():
         SUM(CASE WHEN a.last_contacted_at IS NOT NULL THEN 1 ELSE 0 END) AS contacted,
         SUM(CASE WHEN a.lifecycle_stage='Demo' OR a.sales_status='Demo Booked' THEN 1 ELSE 0 END) AS demos,
         SUM(CASE WHEN a.lifecycle_stage='Customer' OR a.sales_status='Won' THEN 1 ELSE 0 END) AS customers,
+        COALESCE(SUM((SELECT monthly_license FROM sales_opportunities o WHERE o.account_id=a.account_id AND o.commercial_status='Won')),0) AS mrr,
         (SELECT COUNT(*) FROM sales_tasks t WHERE t.assigned_to=a.owner AND t.status='Open') AS open_tasks
         FROM sales_accounts a WHERE COALESCE(a.owner,'') <> '' GROUP BY a.owner ORDER BY customers DESC, contacted DESC""").fetchall()
     owners = [{"owner": r[0], "accounts": r[1], "top_accounts": r[2], "contacted": r[3],
-               "demos": r[4], "customers": r[5], "open_tasks": r[6]} for r in owner_rows]
+               "demos": r[4], "customers": r[5], "mrr": round(r[6] or 0, 2), "open_tasks": r[7]} for r in owner_rows]
     campaign_rows = db.execute("""SELECT c.name,
         (SELECT COUNT(*) FROM sales_campaign_enrolments e WHERE e.campaign_id=c.campaign_id),
         (SELECT COUNT(*) FROM sales_campaign_actions x JOIN sales_campaign_enrolments e ON e.enrolment_id=x.enrolment_id WHERE e.campaign_id=c.campaign_id AND x.status='Due'),
