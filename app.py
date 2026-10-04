@@ -4,6 +4,8 @@ import os
 import re
 import secrets
 import sqlite3
+import subprocess
+import sys
 import time
 import uuid
 from collections import defaultdict, deque
@@ -642,12 +644,37 @@ def filtered_cqc_prospects():
     return rows, total, page, pages, dict(q=q, area=area, service=service, rating=rating, status=status, multi=multi, segment=segment, priority=priority)
 
 
+@app.post("/admin/sales/cqc-sync")
+@admin_required
+def admin_cqc_sync():
+    if not check_csrf(request.form.get("csrf_token", "")):
+        abort(400)
+    db = get_db()
+    running = db.execute("SELECT sync_id FROM cqc_sync_runs WHERE status='Running' ORDER BY started_at DESC LIMIT 1").fetchone()
+    if running:
+        return redirect(url_for("admin_cqc_prospects", sync="running"))
+    mode = clean(request.form.get("mode"), 20)
+    args = [sys.executable, str(BASE_DIR / "cqc_admin_sync.py")]
+    if mode == "full":
+        args.append("--full")
+    else:
+        args.extend(["--limit", "100"])
+    subprocess.Popen(args, cwd=str(BASE_DIR), env=os.environ.copy(),
+                     stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL,
+                     start_new_session=True)
+    return redirect(url_for("admin_cqc_prospects", sync="started"))
+
+
 @app.get("/admin/sales/cqc-prospects")
 @admin_required
 def admin_cqc_prospects():
     prospects, total, page, pages, filters = filtered_cqc_prospects()
     db = get_db()
     imported_total = db.execute("SELECT COUNT(*) FROM cqc_providers").fetchone()[0]
+    imported_locations = db.execute("SELECT COUNT(*) FROM cqc_locations").fetchone()[0]
+    latest_sync = db.execute("""SELECT sync_id, sync_type, status, started_at, completed_at,
+        providers_seen, locations_seen, records_changed, error_message
+        FROM cqc_sync_runs ORDER BY started_at DESC LIMIT 1""").fetchone()
     service_types = [r[0] for r in db.execute(
         "SELECT DISTINCT service_type_name FROM cqc_location_service_types WHERE service_type_name IS NOT NULL ORDER BY service_type_name"
     ).fetchall()]
@@ -667,7 +694,9 @@ def admin_cqc_prospects():
     return render_template("admin_cqc_prospects.html", prospects=prospects, total=total,
                            imported_total=imported_total, page=page, pages=pages, filters=filters,
                            service_types=service_types, ratings=ratings, segments=segments,
-                           registration_statuses=registration_statuses, page_url=page_url)
+                           registration_statuses=registration_statuses, page_url=page_url,
+                           imported_locations=imported_locations, latest_sync=latest_sync,
+                           sync_notice=request.args.get("sync"))
 
 
 SALES_STAGES = ["Prospect", "Contacted", "Qualified", "Demo", "Trial", "Customer", "Closed"]
