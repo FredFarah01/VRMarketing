@@ -697,7 +697,7 @@ def admin_cqc_prospects():
         providers_seen, locations_seen, records_changed, error_message
         FROM cqc_sync_runs ORDER BY started_at DESC LIMIT 1""").fetchone()
     sync_is_running = False
-    if latest_sync and latest_sync["status"] == "Running":
+    if latest_sync and latest_sync["status"] in ("Queued", "Running"):
         try:
             sync_started = datetime.fromisoformat(str(latest_sync["started_at"]).replace("Z", "+00:00"))
             if sync_started.tzinfo is None:
