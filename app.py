@@ -672,35 +672,19 @@ def admin_cqc_sync():
     if not check_csrf(request.form.get("csrf_token", "")):
         abort(400)
     db = get_db()
-    running = db.execute("SELECT sync_id, sync_type, started_at, providers_seen, locations_seen FROM cqc_sync_runs WHERE status='Running' ORDER BY started_at DESC LIMIT 1").fetchone()
-    if running:
-        try:
-            started = datetime.fromisoformat(str(running["started_at"]).replace("Z", "+00:00"))
-            if started.tzinfo is None:
-                started = started.replace(tzinfo=timezone.utc)
-            age = datetime.now(timezone.utc) - started
-            no_progress = int(running["providers_seen"] or 0) == 0 and int(running["locations_seen"] or 0) == 0
-            stale_after = timedelta(minutes=5) if no_progress else (timedelta(hours=6) if running["sync_type"] == "full" else timedelta(minutes=15))
-            stale = age > stale_after
-        except (TypeError, ValueError):
-            stale = True
-        if stale:
-            db.execute("""UPDATE cqc_sync_runs SET status='Failed', completed_at=?, error_message=?
-                          WHERE sync_id=? AND status='Running'""",
-                       (now_iso(), "Sync worker was interrupted or exceeded 15 minutes; safe to retry.", running["sync_id"]))
-            db.commit()
-        else:
-            return redirect(url_for("admin_cqc_prospects", sync="running"))
+    active = db.execute("""SELECT sync_id FROM cqc_sync_runs
+                           WHERE status IN ('Queued','Running')
+                           ORDER BY started_at DESC LIMIT 1""").fetchone()
+    if active:
+        return redirect(url_for("admin_cqc_prospects", sync="running"))
     mode = clean(request.form.get("mode"), 20)
-    args = [sys.executable, str(BASE_DIR / "cqc_admin_sync.py")]
-    if mode == "full":
-        args.append("--full")
-    else:
-        args.extend(["--limit", "100"])
-    subprocess.Popen(args, cwd=str(BASE_DIR), env=os.environ.copy(),
-                     start_new_session=True)
+    sync_id = str(uuid.uuid4())
+    db.execute("""INSERT INTO cqc_sync_runs
+                  (sync_id, sync_type, status, started_at, providers_seen, locations_seen, records_changed)
+                  VALUES (?,?, 'Queued', ?,0,0,0)""",
+               (sync_id, "full" if mode == "full" else "limited", now_iso()))
+    db.commit()
     return redirect(url_for("admin_cqc_prospects", sync="started"))
-
 
 @app.get("/admin/sales/cqc-prospects")
 @admin_required
@@ -1146,7 +1130,42 @@ def admin_leads_csv():
                     headers={"Content-Disposition": f"attachment; filename=veridyn-leads-{datetime.now():%Y%m%d}.csv"})
 
 
+def _cqc_background_worker():
+    """Persistent DB-backed CQC worker. Queued work survives web restarts."""
+    time.sleep(2)
+    while True:
+        db = None
+        try:
+            db = connect()
+            job = db.execute("""SELECT sync_id, sync_type FROM cqc_sync_runs
+                                WHERE status='Queued' ORDER BY started_at ASC LIMIT 1""").fetchone()
+            if job:
+                sync_id, sync_type = job["sync_id"], job["sync_type"]
+                db.close()
+                db = None
+                from cqc_sync import run_sync
+                run_sync(limit=100 if sync_type == "limited" else None, dry_run=False, sync_id=sync_id)
+                from account_scoring import score_all
+                score_all()
+            else:
+                time.sleep(5)
+        except Exception as exc:
+            print(f"CQC background worker error: {exc}", flush=True)
+            time.sleep(10)
+        finally:
+            if db is not None:
+                db.close()
+
+
 migrate()
+# A Render restart cannot leave a job permanently orphaned: put unfinished work back in the queue.
+_recovery_db = connect()
+_recovery_db.execute("""UPDATE cqc_sync_runs SET status='Queued', error_message=?
+                        WHERE status='Running'""",
+                     ("Worker restarted; queued automatically to resume.",))
+_recovery_db.commit()
+_recovery_db.close()
+threading.Thread(target=_cqc_background_worker, name="cqc-sync-worker", daemon=True).start()
 print(f"Lead storage: {'Supabase/Postgres' if USE_PG else f'SQLite ({DB_PATH})'}")
 if not PDF_PATH.exists():
     build_checklist_pdf(PDF_PATH)
