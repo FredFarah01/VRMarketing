@@ -41,7 +41,7 @@
         <td><small>{{ p.service_types or '—' }}</small></td>
         <td><small>{{ p.ratings or 'Not yet rated / unavailable' }}</small></td>
         <td>{% if p.website %}<a href="{{ p.website }}" target="_blank" rel="noopener">Website</a>{% else %}—{% endif %}</td>
-        <td>{% if p.account_id %}<span class="pill pill--{{ 'red' if p.priority=='A1' else 'amber' if p.priority=='A2' else 'slate' }}">{{ p.priority }} · {{ p.account_score }}</span><br><strong>{{ p.target_segment }}</strong><br><small>{{ p.sales_status }}</small><br><small title="{{ p.score_reasons or '' }}">Why: {{ p.score_reasons or 'No scoring signals' }}</small>{% else %}<small>Not yet scored</small>{% endif %}</td>
+        <td>{% if p.account_id %}<span class="pill pill--{{ 'red' if p.priority=='A1' else 'amber' if p.priority=='A2' else 'slate' }}">{{ p.priority }} · {{ p.account_score }}</span><br><strong>{{ p.target_segment }}</strong><br><small>{{ p.sales_status }}</small><br><small><strong>Why:</strong>{% if p.score_reason_items %}{% for reason in p.score_reason_items %} <span>+{{ reason.points }} {{ reason.reason }}{{ ' ·' if not loop.last }}</span>{% endfor %}{% else %} No scoring signals{% endif %}</small>{% else %}<small>Not yet scored</small>{% endif %}</td>
       </tr>
       {% else %}<tr><td colspan="7" class="empty">No CQC providers match these filters. Import CQC data first if the database is empty.</td></tr>{% endfor %}
       </tbody>
