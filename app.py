@@ -652,7 +652,18 @@ def filtered_cqc_prospects():
         ORDER BY location_count DESC, p.provider_name
         LIMIT ? OFFSET ?
     """, params + [per_page, offset]).fetchall()
-    return rows, total, page, pages, dict(q=q, area=area, service=service, rating=rating, status=status, multi=multi, segment=segment, priority=priority)
+    prospect_rows = []
+    for row in rows:
+        item = dict(row)
+        try:
+            reasons = json.loads(item.get("score_reasons") or "[]")
+            if not isinstance(reasons, list):
+                reasons = []
+        except (TypeError, ValueError, json.JSONDecodeError):
+            reasons = []
+        item["score_reason_items"] = reasons
+        prospect_rows.append(item)
+    return prospect_rows, total, page, pages, dict(q=q, area=area, service=service, rating=rating, status=status, multi=multi, segment=segment, priority=priority)
 
 
 @app.post("/admin/sales/cqc-sync")
