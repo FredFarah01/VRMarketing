@@ -132,6 +132,17 @@ def close_db(_exc):
         db.close()
 
 
+CQC_MANAGER_MIGRATION = """
+CREATE TABLE IF NOT EXISTS cqc_registered_managers (
+    location_id TEXT NOT NULL,
+    manager_name TEXT NOT NULL,
+    source_url TEXT NOT NULL,
+    fetched_at TEXT NOT NULL,
+    PRIMARY KEY (location_id, manager_name)
+);
+CREATE INDEX IF NOT EXISTS idx_cqc_managers_location ON cqc_registered_managers(location_id);
+"""
+
 MIGRATIONS = [
     """
     CREATE TABLE IF NOT EXISTS marketing_leads (
@@ -183,6 +194,7 @@ MIGRATIONS = [
     );
     """,
     CQC_SALES_MIGRATION,
+    CQC_MANAGER_MIGRATION,
 ]
 
 PG_MIGRATIONS = [
@@ -193,6 +205,7 @@ PG_MIGRATIONS = [
     ALTER TABLE schema_migrations ENABLE ROW LEVEL SECURITY;
     """,
     CQC_SALES_PG_MIGRATION,
+    CQC_MANAGER_MIGRATION,
 ]
 
 
