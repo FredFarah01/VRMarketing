@@ -152,6 +152,10 @@
   wireForm(document.getElementById("lead-form"), "/api/leads", function (res) { location.href = res.redirect; }, "lead_form_started");
   wireForm(document.getElementById("demo-form"), "/api/demo-requests", function () {
     var form = document.getElementById("demo-form"), ok = document.getElementById("demo-success");
-    form.hidden = true; ok.hidden = false; ok.focus();
+    form.reset();
+    form.hidden = true;
+    form.style.display = "none";
+    ok.hidden = false;
+    ok.focus();
   }, null);
 })();
