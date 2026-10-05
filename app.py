@@ -563,8 +563,14 @@ def admin_leads():
         "SELECT event_name, COUNT(DISTINCT COALESCE(visitor_id, CAST(id AS TEXT))) FROM marketing_events GROUP BY event_name")}
     funnel = [(n, counts.get(n, 0)) for n in funnel_names]
     total = db.execute("SELECT COUNT(*) FROM marketing_leads").fetchone()[0]
+    demo_requests = db.execute("""SELECT d.*, l.status AS lead_status, l.lead_temperature, l.lead_score
+        FROM marketing_demo_requests d
+        LEFT JOIN marketing_leads l ON l.lead_id=d.lead_id
+        ORDER BY d.created_at DESC LIMIT 100""").fetchall()
+    demo_total = db.execute("SELECT COUNT(*) FROM marketing_demo_requests").fetchone()[0]
     return render_template("admin_leads.html", leads=leads, filters=filters, statuses=LEAD_STATUSES,
-                           roles=JOB_ROLES, sizes=ORG_SIZES, funnel=funnel, total=total)
+                           roles=JOB_ROLES, sizes=ORG_SIZES, funnel=funnel, total=total,
+                           demo_requests=demo_requests, demo_total=demo_total)
 
 
 def filtered_cqc_prospects():
