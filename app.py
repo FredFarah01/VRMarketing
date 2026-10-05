@@ -751,7 +751,7 @@ def admin_sales_dashboard():
     scalar = lambda sql, params=(): db.execute(sql, params).fetchone()[0]
     providers = scalar("SELECT COUNT(*) FROM cqc_providers")
     locations = scalar("SELECT COUNT(*) FROM cqc_locations")
-    registered = scalar("SELECT COUNT(*) FROM cqc_providers WHERE LOWER(COALESCE(registration_status,'')) LIKE '%registered%' AND LOWER(COALESCE(registration_status,'')) NOT LIKE '%deregister%'")
+    registered = scalar("SELECT COUNT(*) FROM cqc_providers WHERE LOWER(COALESCE(registration_status,'')) LIKE ? AND LOWER(COALESCE(registration_status,'')) NOT LIKE ?", ("%registered%", "%deregister%"))
     accounts = scalar("SELECT COUNT(*) FROM sales_accounts")
     priority_a = scalar("SELECT COUNT(*) FROM sales_accounts WHERE priority IN ('A1','A2')")
     multi_site = scalar("SELECT COUNT(*) FROM sales_accounts WHERE location_count >= 2")
