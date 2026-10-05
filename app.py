@@ -672,14 +672,16 @@ def admin_cqc_sync():
     if not check_csrf(request.form.get("csrf_token", "")):
         abort(400)
     db = get_db()
-    running = db.execute("SELECT sync_id, sync_type, started_at FROM cqc_sync_runs WHERE status='Running' ORDER BY started_at DESC LIMIT 1").fetchone()
+    running = db.execute("SELECT sync_id, sync_type, started_at, providers_seen, locations_seen FROM cqc_sync_runs WHERE status='Running' ORDER BY started_at DESC LIMIT 1").fetchone()
     if running:
         try:
             started = datetime.fromisoformat(str(running["started_at"]).replace("Z", "+00:00"))
             if started.tzinfo is None:
                 started = started.replace(tzinfo=timezone.utc)
-            stale_after = timedelta(hours=6) if running["sync_type"] == "full" else timedelta(minutes=15)
-            stale = datetime.now(timezone.utc) - started > stale_after
+            age = datetime.now(timezone.utc) - started
+            no_progress = int(running["providers_seen"] or 0) == 0 and int(running["locations_seen"] or 0) == 0
+            stale_after = timedelta(minutes=5) if no_progress else (timedelta(hours=6) if running["sync_type"] == "full" else timedelta(minutes=15))
+            stale = age > stale_after
         except (TypeError, ValueError):
             stale = True
         if stale:
@@ -716,8 +718,10 @@ def admin_cqc_prospects():
             sync_started = datetime.fromisoformat(str(latest_sync["started_at"]).replace("Z", "+00:00"))
             if sync_started.tzinfo is None:
                 sync_started = sync_started.replace(tzinfo=timezone.utc)
-            active_window = timedelta(hours=6) if latest_sync["sync_type"] == "full" else timedelta(minutes=15)
-            sync_is_running = datetime.now(timezone.utc) - sync_started <= active_window
+            sync_age = datetime.now(timezone.utc) - sync_started
+            no_progress = int(latest_sync["providers_seen"] or 0) == 0 and int(latest_sync["locations_seen"] or 0) == 0
+            active_window = timedelta(minutes=5) if no_progress else (timedelta(hours=6) if latest_sync["sync_type"] == "full" else timedelta(minutes=15))
+            sync_is_running = sync_age <= active_window
         except (TypeError, ValueError):
             sync_is_running = False
     service_types = [r[0] for r in db.execute(
