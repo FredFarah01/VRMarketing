@@ -1,5 +1,6 @@
 import csv
 import io
+import json
 import os
 import re
 import secrets
@@ -887,8 +888,14 @@ def admin_sales_account(account_id):
     candidates = db.execute("SELECT * FROM sales_contact_candidates WHERE account_id=? AND status=? ORDER BY first_found_at DESC", (account_id, "Review")).fetchall()
     activities = db.execute("SELECT * FROM sales_activities WHERE account_id=? ORDER BY occurred_at DESC LIMIT 100", (account_id,)).fetchall()
     tasks = db.execute("SELECT * FROM sales_tasks WHERE account_id=? ORDER BY CASE status WHEN 'Open' THEN 0 ELSE 1 END, due_at, created_at DESC", (account_id,)).fetchall()
+    try:
+        score_reasons = json.loads(account["score_reasons"] or "[]")
+        if not isinstance(score_reasons, list):
+            score_reasons = []
+    except (TypeError, ValueError, json.JSONDecodeError):
+        score_reasons = []
     return render_template("admin_sales_account.html", account=account, opportunity=opportunity, contacts=contacts, candidates=candidates, activities=activities,
-                           tasks=tasks, stages=SALES_STAGES, statuses=SALES_STATUSES)
+                           tasks=tasks, stages=SALES_STAGES, statuses=SALES_STATUSES, score_reasons=score_reasons)
 
 
 @app.post("/admin/sales/accounts/<account_id>/update")
