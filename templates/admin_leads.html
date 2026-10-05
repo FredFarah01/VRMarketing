@@ -11,6 +11,28 @@
       <div><h1>Leads</h1><p>{{ leads|length }} of {{ total }} leads</p></div>
       <a class="btn btn--primary btn--sm" href="/admin/marketing/leads.csv?{{ request.query_string.decode() }}">Export CSV</a>
     </div>
+    <section style="margin-bottom:1.5rem">
+      <div class="admin__head" style="margin-bottom:.75rem"><div><h2>Demo Requests</h2><p>{{ demo_total }} submitted demo request{{ '' if demo_total == 1 else 's' }}</p></div></div>
+      <div class="table-scroll card">
+        <table class="admin-table">
+          <thead><tr><th>Requested</th><th>Name</th><th>Organisation</th><th>Contact</th><th>Message</th><th>Lead</th></tr></thead>
+          <tbody>
+          {% for d in demo_requests %}
+            <tr>
+              <td>{{ d.created_at[:10] }}<br><small>{{ d.created_at[11:16] }} UTC</small></td>
+              <td><strong>{{ d.first_name }} {{ d.last_name }}</strong></td>
+              <td>{{ d.organisation }}</td>
+              <td><a href="mailto:{{ d.email }}">{{ d.email }}</a>{% if d.phone %}<br><a href="tel:{{ d.phone }}">{{ d.phone }}</a>{% endif %}</td>
+              <td>{{ d.message or '—' }}</td>
+              <td>{% if d.lead_id %}<strong>{{ d.lead_status or 'Linked' }}</strong>{% if d.lead_temperature %}<br><small>{{ d.lead_temperature }} · {{ d.lead_score }}</small>{% endif %}{% else %}<span class="pill pill--amber">Demo-only lead</span>{% endif %}</td>
+            </tr>
+          {% else %}
+            <tr><td colspan="6" class="empty">No demo requests yet.</td></tr>
+          {% endfor %}
+          </tbody>
+        </table>
+      </div>
+    </section>
     <div class="funnel" aria-label="Funnel (unique visitors per event)">
       {% for name, n in funnel %}<div class="funnel__step"><span>{{ name.replace('_',' ') }}</span><strong>{{ n }}</strong></div>{% endfor %}
     </div>
