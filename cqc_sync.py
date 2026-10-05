@@ -277,6 +277,14 @@ def run_sync(limit=None, dry_run=False):
             detail = fetch_provider(provider_id) if provider_id else summary
             provider_count += 1
             changed += int(_upsert_provider(db, detail))
+            if provider_count % 100 == 0:
+                db.execute("UPDATE cqc_sync_runs SET providers_seen=?, records_changed=? WHERE sync_id=?",
+                           (provider_count, changed, sync_id))
+                db.commit()
+
+        db.execute("UPDATE cqc_sync_runs SET providers_seen=?, records_changed=? WHERE sync_id=?",
+                   (provider_count, changed, sync_id))
+        db.commit()
 
         # Providers are loaded first to satisfy the provider/location foreign key.
         for summary in iter_collection("locations", "locations", limit=limit):
@@ -289,6 +297,11 @@ def run_sync(limit=None, dry_run=False):
                 _upsert_provider(db, parent_detail)
             location_count += 1
             changed += int(_upsert_location(db, detail))
+            if location_count % 100 == 0:
+                db.execute("""UPDATE cqc_sync_runs SET providers_seen=?, locations_seen=?,
+                              records_changed=? WHERE sync_id=?""",
+                           (provider_count, location_count, changed, sync_id))
+                db.commit()
 
         db.execute(
             """UPDATE cqc_sync_runs SET status='Completed', completed_at=?,
