@@ -11,6 +11,7 @@ import time
 import threading
 import uuid
 from collections import defaultdict, deque
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timezone, timedelta
 from functools import wraps
 from pathlib import Path
@@ -906,6 +907,30 @@ def admin_sales_account(account_id):
     candidates = db.execute("SELECT * FROM sales_contact_candidates WHERE account_id=? AND status=? ORDER BY first_found_at DESC", (account_id, "Review")).fetchall()
     activities = db.execute("SELECT * FROM sales_activities WHERE account_id=? ORDER BY occurred_at DESC LIMIT 100", (account_id,)).fetchall()
     tasks = db.execute("SELECT * FROM sales_tasks WHERE account_id=? ORDER BY CASE status WHEN 'Open' THEN 0 ELSE 1 END, due_at, created_at DESC", (account_id,)).fetchall()
+    manager_rows = db.execute("""SELECT m.manager_name,m.source_url,l.location_name,l.location_id
+        FROM cqc_registered_managers m JOIN cqc_locations l ON l.location_id=m.location_id
+        WHERE l.provider_id=? ORDER BY l.location_name,m.manager_name""", (account["provider_id"],)).fetchall()
+    if not manager_rows:
+        location_rows = db.execute("SELECT location_id FROM cqc_locations WHERE provider_id=? ORDER BY location_name", (account["provider_id"],)).fetchall()
+        location_ids = [row["location_id"] for row in location_rows]
+        if location_ids:
+            try:
+                from cqc_managers import fetch_registered_managers
+                with ThreadPoolExecutor(max_workers=min(6, len(location_ids))) as pool:
+                    results = list(pool.map(fetch_registered_managers, location_ids))
+                fetched_at = now_iso()
+                for result in results:
+                    for manager_name in result["managers"]:
+                        db.execute("""INSERT INTO cqc_registered_managers(location_id,manager_name,source_url,fetched_at)
+                                      VALUES (?,?,?,?) ON CONFLICT(location_id,manager_name)
+                                      DO UPDATE SET source_url=excluded.source_url,fetched_at=excluded.fetched_at""",
+                                   (result["location_id"], manager_name, result["source_url"], fetched_at))
+                db.commit()
+                manager_rows = db.execute("""SELECT m.manager_name,m.source_url,l.location_name,l.location_id
+                    FROM cqc_registered_managers m JOIN cqc_locations l ON l.location_id=m.location_id
+                    WHERE l.provider_id=? ORDER BY l.location_name,m.manager_name""", (account["provider_id"],)).fetchall()
+            except Exception as exc:
+                print(f"CQC registered-manager lookup failed for {account['provider_id']}: {exc}", flush=True)
     try:
         score_reasons = json.loads(account["score_reasons"] or "[]")
         if not isinstance(score_reasons, list):
@@ -913,7 +938,7 @@ def admin_sales_account(account_id):
     except (TypeError, ValueError, json.JSONDecodeError):
         score_reasons = []
     return render_template("admin_sales_account.html", account=account, opportunity=opportunity, contacts=contacts, candidates=candidates, activities=activities,
-                           tasks=tasks, stages=SALES_STAGES, statuses=SALES_STATUSES, score_reasons=score_reasons)
+                           tasks=tasks, stages=SALES_STAGES, statuses=SALES_STATUSES, score_reasons=score_reasons, registered_managers=manager_rows)
 
 
 @app.post("/admin/sales/accounts/<account_id>/update")
