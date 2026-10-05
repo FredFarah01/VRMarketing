@@ -255,7 +255,7 @@ def _upsert_location(db, record):
     return True
 
 
-def run_sync(limit=None, dry_run=False):
+def run_sync(limit=None, dry_run=False, sync_id=None):
     if dry_run:
         providers = list(iter_collection("providers", "providers", limit=limit))
         locations = list(iter_collection("locations", "locations", limit=limit))
@@ -263,12 +263,17 @@ def run_sync(limit=None, dry_run=False):
 
     migrate()
     db = connect()
-    sync_id = str(uuid.uuid4())
     started = now_iso()
-    db.execute(
-        "INSERT INTO cqc_sync_runs (sync_id, sync_type, status, started_at) VALUES (?,?,?,?)",
-        (sync_id, "limited" if limit else "full", "Running", started),
-    )
+    if sync_id:
+        db.execute("""UPDATE cqc_sync_runs SET status='Running', started_at=?, completed_at=NULL,
+                      providers_seen=0, locations_seen=0, records_changed=0, error_message=NULL
+                      WHERE sync_id=?""", (started, sync_id))
+    else:
+        sync_id = str(uuid.uuid4())
+        db.execute(
+            "INSERT INTO cqc_sync_runs (sync_id, sync_type, status, started_at) VALUES (?,?,?,?)",
+            (sync_id, "limited" if limit else "full", "Running", started),
+        )
     db.commit()
     provider_count = location_count = changed = 0
     try:
