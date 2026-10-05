@@ -276,6 +276,7 @@ def run_sync(limit=None, dry_run=False, sync_id=None):
         )
     db.commit()
     provider_count = location_count = changed = 0
+    print(f"CQC sync {sync_id} started ({'limited' if limit else 'full'})", flush=True)
     try:
         for summary in iter_collection("providers", "providers", limit=limit):
             provider_id = _first(summary, "providerId", "providerID", "id")
@@ -286,6 +287,7 @@ def run_sync(limit=None, dry_run=False, sync_id=None):
                 db.execute("UPDATE cqc_sync_runs SET providers_seen=?, records_changed=? WHERE sync_id=?",
                            (provider_count, changed, sync_id))
                 db.commit()
+                print(f"CQC sync {sync_id}: {provider_count} providers committed", flush=True)
 
         db.execute("UPDATE cqc_sync_runs SET providers_seen=?, records_changed=? WHERE sync_id=?",
                    (provider_count, changed, sync_id))
@@ -307,6 +309,7 @@ def run_sync(limit=None, dry_run=False, sync_id=None):
                               records_changed=? WHERE sync_id=?""",
                            (provider_count, location_count, changed, sync_id))
                 db.commit()
+                print(f"CQC sync {sync_id}: {location_count} locations committed", flush=True)
 
         db.execute(
             """UPDATE cqc_sync_runs SET status='Completed', completed_at=?,
@@ -314,6 +317,7 @@ def run_sync(limit=None, dry_run=False, sync_id=None):
             (now_iso(), provider_count, location_count, changed, sync_id),
         )
         db.commit()
+        print(f"CQC sync {sync_id} completed: {provider_count} providers, {location_count} locations", flush=True)
         return {"sync_id": sync_id, "providers_seen": provider_count, "locations_seen": location_count, "records_changed": changed}
     except Exception as exc:
         db.rollback()
