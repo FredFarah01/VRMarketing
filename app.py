@@ -133,6 +133,12 @@ def close_db(_exc):
         db.close()
 
 
+CQC_RESUME_MIGRATION = """
+ALTER TABLE cqc_sync_runs ADD COLUMN IF NOT EXISTS phase TEXT DEFAULT 'providers';
+ALTER TABLE cqc_sync_runs ADD COLUMN IF NOT EXISTS provider_page INTEGER DEFAULT 1;
+ALTER TABLE cqc_sync_runs ADD COLUMN IF NOT EXISTS location_page INTEGER DEFAULT 1;
+"""
+
 CQC_MANAGER_MIGRATION = """
 CREATE TABLE IF NOT EXISTS cqc_registered_managers (
     location_id TEXT NOT NULL,
@@ -196,6 +202,7 @@ MIGRATIONS = [
     """,
     CQC_SALES_MIGRATION,
     CQC_MANAGER_MIGRATION,
+    CQC_RESUME_MIGRATION,
 ]
 
 PG_MIGRATIONS = [
@@ -207,6 +214,7 @@ PG_MIGRATIONS = [
     """,
     CQC_SALES_PG_MIGRATION,
     CQC_MANAGER_MIGRATION,
+    CQC_RESUME_MIGRATION,
 ]
 
 
