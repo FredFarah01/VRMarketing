@@ -119,10 +119,14 @@ def classify_and_score(provider, locations, service_names, specialism_names):
     return segment, score, priority, reasons, website
 
 
-def score_all(limit=None):
+def score_all(limit=None, provider_ids=None):
     migrate()
     db = connect()
-    providers = db.execute("SELECT * FROM cqc_providers ORDER BY provider_name").fetchall()
+    if provider_ids:
+        placeholders = ",".join("?" for _ in provider_ids)
+        providers = db.execute(f"SELECT * FROM cqc_providers WHERE provider_id IN ({placeholders}) ORDER BY provider_name", tuple(provider_ids)).fetchall()
+    else:
+        providers = db.execute("SELECT * FROM cqc_providers ORDER BY provider_name").fetchall()
     if limit:
         providers = providers[:limit]
     processed = 0
