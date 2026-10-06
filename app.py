@@ -133,6 +133,16 @@ def close_db(_exc):
         db.close()
 
 
+CQC_TARGET_FIRST_MIGRATION = """
+-- Existing full jobs imported providers first. Move the active national job to the
+-- location collection, where CQC exposes the service-type/specialism signals that
+-- identify Veridyn's target market.
+UPDATE cqc_sync_runs
+SET phase='locations', location_page=1, status='Queued',
+    error_message='Switched to target-first location/service discovery.'
+WHERE sync_type='full' AND status IN ('Queued','Running') AND COALESCE(locations_seen,0) <= 100;
+"""
+
 CQC_RESUME_MIGRATION = """
 ALTER TABLE cqc_sync_runs ADD COLUMN IF NOT EXISTS phase TEXT DEFAULT 'providers';
 ALTER TABLE cqc_sync_runs ADD COLUMN IF NOT EXISTS provider_page INTEGER DEFAULT 1;
@@ -203,6 +213,7 @@ MIGRATIONS = [
     CQC_SALES_MIGRATION,
     CQC_MANAGER_MIGRATION,
     CQC_RESUME_MIGRATION,
+    CQC_TARGET_FIRST_MIGRATION,
 ]
 
 PG_MIGRATIONS = [
@@ -215,6 +226,7 @@ PG_MIGRATIONS = [
     CQC_SALES_PG_MIGRATION,
     CQC_MANAGER_MIGRATION,
     CQC_RESUME_MIGRATION,
+    CQC_TARGET_FIRST_MIGRATION,
 ]
 
 
