@@ -255,7 +255,19 @@ def _upsert_location(db, record):
     return True
 
 
+def _page(path, collection, page):
+    payload = _request_json(path, {"page": page, "perPage": CQC_PAGE_SIZE})
+    items = _list_items(payload, collection)
+    total_pages = _nested(payload, "totalPages") or _nested(payload, "meta", "totalPages")
+    return items, int(total_pages) if total_pages else None
+
+
 def run_sync(limit=None, dry_run=False, sync_id=None):
+    """Run a bounded, resumable CQC sync.
+
+    Full imports persist the current collection/page in cqc_sync_runs. Only one API
+    page is processed per call, keeping memory bounded on small Render instances.
+    """
     if dry_run:
         providers = list(iter_collection("providers", "providers", limit=limit))
         locations = list(iter_collection("locations", "locations", limit=limit))
@@ -264,68 +276,90 @@ def run_sync(limit=None, dry_run=False, sync_id=None):
     migrate()
     db = connect()
     started = now_iso()
-    if sync_id:
-        db.execute("""UPDATE cqc_sync_runs SET status='Running', started_at=?, completed_at=NULL,
-                      providers_seen=0, locations_seen=0, records_changed=0, error_message=NULL
-                      WHERE sync_id=?""", (started, sync_id))
-    else:
+    if not sync_id:
         sync_id = str(uuid.uuid4())
-        db.execute(
-            "INSERT INTO cqc_sync_runs (sync_id, sync_type, status, started_at) VALUES (?,?,?,?)",
-            (sync_id, "limited" if limit else "full", "Running", started),
-        )
-    db.commit()
-    provider_count = location_count = changed = 0
-    print(f"CQC sync {sync_id} started ({'limited' if limit else 'full'})", flush=True)
+        db.execute("""INSERT INTO cqc_sync_runs
+            (sync_id,sync_type,status,started_at,providers_seen,locations_seen,records_changed,phase,provider_page,location_page)
+            VALUES (?,?, 'Running', ?,0,0,0,'providers',1,1)""",
+            (sync_id, "limited" if limit else "full", started))
+        db.commit()
+
+    job = db.execute("""SELECT sync_type,status,providers_seen,locations_seen,records_changed,
+                       COALESCE(phase,'providers') AS phase,COALESCE(provider_page,1) AS provider_page,
+                       COALESCE(location_page,1) AS location_page FROM cqc_sync_runs WHERE sync_id=?""",
+                     (sync_id,)).fetchone()
+    if not job:
+        db.close()
+        raise RuntimeError("CQC sync job not found")
+
+    # Limited sync retains the original simple behaviour.
+    if limit:
+        db.execute("UPDATE cqc_sync_runs SET status='Running', started_at=?, error_message=NULL WHERE sync_id=?",
+                   (started, sync_id)); db.commit()
+        provider_count = location_count = changed = 0
+        try:
+            for summary in iter_collection("providers", "providers", limit=limit):
+                pid = _first(summary, "providerId", "providerID", "id")
+                changed += int(_upsert_provider(db, fetch_provider(pid) if pid else summary)); provider_count += 1
+            for summary in iter_collection("locations", "locations", limit=limit):
+                lid = _first(summary, "locationId", "locationID", "id")
+                detail = fetch_location(lid) if lid else summary
+                parent_id = _first(detail, "providerId", "providerID")
+                if parent_id and not db.execute("SELECT provider_id FROM cqc_providers WHERE provider_id=?", (parent_id,)).fetchone():
+                    _upsert_provider(db, fetch_provider(parent_id))
+                changed += int(_upsert_location(db, detail)); location_count += 1
+            db.execute("""UPDATE cqc_sync_runs SET status='Completed',completed_at=?,providers_seen=?,
+                          locations_seen=?,records_changed=? WHERE sync_id=?""",
+                       (now_iso(),provider_count,location_count,changed,sync_id)); db.commit()
+            return {"sync_id":sync_id,"completed":True}
+        finally:
+            db.close()
+
+    phase, ppage, lpage = job["phase"], int(job["provider_page"]), int(job["location_page"])
+    providers_seen, locations_seen, changed = int(job["providers_seen"] or 0), int(job["locations_seen"] or 0), int(job["records_changed"] or 0)
+    db.execute("UPDATE cqc_sync_runs SET status='Running',error_message=NULL WHERE sync_id=?", (sync_id,)); db.commit()
     try:
-        for summary in iter_collection("providers", "providers", limit=limit):
-            provider_id = _first(summary, "providerId", "providerID", "id")
-            detail = fetch_provider(provider_id) if provider_id else summary
-            provider_count += 1
-            changed += int(_upsert_provider(db, detail))
-            if provider_count % 100 == 0:
-                db.execute("UPDATE cqc_sync_runs SET providers_seen=?, records_changed=? WHERE sync_id=?",
-                           (provider_count, changed, sync_id))
-                db.commit()
-                print(f"CQC sync {sync_id}: {provider_count} providers committed", flush=True)
-
-        db.execute("UPDATE cqc_sync_runs SET providers_seen=?, records_changed=? WHERE sync_id=?",
-                   (provider_count, changed, sync_id))
-        db.commit()
-
-        # Providers are loaded first to satisfy the provider/location foreign key.
-        for summary in iter_collection("locations", "locations", limit=limit):
-            location_id = _first(summary, "locationId", "locationID", "id")
-            detail = fetch_location(location_id) if location_id else summary
-            parent_id = _first(detail, "providerId", "providerID")
-            parent_exists = db.execute("SELECT provider_id FROM cqc_providers WHERE provider_id=?", (parent_id,)).fetchone() if parent_id else None
-            if parent_id and not parent_exists:
-                parent_detail = fetch_provider(parent_id)
-                _upsert_provider(db, parent_detail)
-            location_count += 1
-            changed += int(_upsert_location(db, detail))
-            if location_count % 100 == 0:
-                db.execute("""UPDATE cqc_sync_runs SET providers_seen=?, locations_seen=?,
-                              records_changed=? WHERE sync_id=?""",
-                           (provider_count, location_count, changed, sync_id))
-                db.commit()
-                print(f"CQC sync {sync_id}: {location_count} locations committed", flush=True)
-
-        db.execute(
-            """UPDATE cqc_sync_runs SET status='Completed', completed_at=?,
-               providers_seen=?, locations_seen=?, records_changed=? WHERE sync_id=?""",
-            (now_iso(), provider_count, location_count, changed, sync_id),
-        )
-        db.commit()
-        print(f"CQC sync {sync_id} completed: {provider_count} providers, {location_count} locations", flush=True)
-        return {"sync_id": sync_id, "providers_seen": provider_count, "locations_seen": location_count, "records_changed": changed}
+        if phase == "providers":
+            items, total_pages = _page("providers", "providers", ppage)
+            if not items:
+                phase = "locations"
+                db.execute("UPDATE cqc_sync_runs SET phase='locations' WHERE sync_id=?", (sync_id,)); db.commit()
+            else:
+                for summary in items:
+                    pid = _first(summary, "providerId", "providerID", "id")
+                    changed += int(_upsert_provider(db, fetch_provider(pid) if pid else summary))
+                    providers_seen += 1
+                next_page = ppage + 1
+                if (total_pages and ppage >= total_pages) or len(items) < CQC_PAGE_SIZE:
+                    phase = "locations"
+                db.execute("""UPDATE cqc_sync_runs SET providers_seen=?,records_changed=?,provider_page=?,phase=?
+                              WHERE sync_id=?""",(providers_seen,changed,next_page,phase,sync_id)); db.commit()
+                print(f"CQC sync {sync_id}: providers page {ppage} committed; {providers_seen} processed", flush=True)
+        else:
+            items, total_pages = _page("locations", "locations", lpage)
+            if not items:
+                db.execute("UPDATE cqc_sync_runs SET status='Completed',completed_at=? WHERE sync_id=?",(now_iso(),sync_id)); db.commit()
+                return {"sync_id":sync_id,"completed":True}
+            for summary in items:
+                lid = _first(summary, "locationId", "locationID", "id")
+                detail = fetch_location(lid) if lid else summary
+                parent_id = _first(detail, "providerId", "providerID")
+                if parent_id and not db.execute("SELECT provider_id FROM cqc_providers WHERE provider_id=?", (parent_id,)).fetchone():
+                    _upsert_provider(db, fetch_provider(parent_id))
+                changed += int(_upsert_location(db, detail)); locations_seen += 1
+            next_page = lpage + 1
+            completed = bool((total_pages and lpage >= total_pages) or len(items) < CQC_PAGE_SIZE)
+            db.execute("""UPDATE cqc_sync_runs SET locations_seen=?,records_changed=?,location_page=?,
+                          status=?,completed_at=? WHERE sync_id=?""",
+                       (locations_seen,changed,next_page,"Completed" if completed else "Running",
+                        now_iso() if completed else None,sync_id)); db.commit()
+            print(f"CQC sync {sync_id}: locations page {lpage} committed; {locations_seen} processed", flush=True)
+            if completed:
+                return {"sync_id":sync_id,"completed":True}
+        return {"sync_id":sync_id,"completed":False,"phase":phase}
     except Exception as exc:
         db.rollback()
-        db.execute(
-            "UPDATE cqc_sync_runs SET status='Failed', completed_at=?, error_message=? WHERE sync_id=?",
-            (now_iso(), str(exc)[:2000], sync_id),
-        )
-        db.commit()
+        db.execute("UPDATE cqc_sync_runs SET status='Queued',error_message=? WHERE sync_id=?",(str(exc)[:2000],sync_id)); db.commit()
         raise
     finally:
         db.close()
