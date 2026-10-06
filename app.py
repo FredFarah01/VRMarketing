@@ -803,8 +803,11 @@ def admin_sales_dashboard():
     }
     sync = db.execute("""SELECT sync_type,status,started_at,completed_at,providers_seen,locations_seen,
                         records_changed,error_message FROM cqc_sync_runs ORDER BY started_at DESC LIMIT 1""").fetchone()
-    segments = [{"name":r[0] or "Unclassified","count":r[1]} for r in db.execute(
-        "SELECT target_segment,COUNT(*) FROM sales_accounts GROUP BY target_segment ORDER BY COUNT(*) DESC LIMIT 8").fetchall()]
+    target_order = ("Domiciliary Care","Care Home","Complex / Supported Care","Multi-Site Care Organisation")
+    segment_counts = {r[0]: r[1] for r in db.execute(
+        "SELECT target_segment,COUNT(*) FROM sales_accounts GROUP BY target_segment").fetchall()}
+    segments = [{"name":name,"count":segment_counts.get(name,0)} for name in target_order]
+    other_provider_count = segment_counts.get("Other CQC Provider",0)
     priorities = [{"name":r[0] or "C","count":r[1]} for r in db.execute(
         """SELECT priority,COUNT(*) FROM sales_accounts GROUP BY priority
            ORDER BY CASE priority WHEN 'A1' THEN 1 WHEN 'A2' THEN 2 WHEN 'B' THEN 3 ELSE 4 END""").fetchall()]
@@ -827,7 +830,7 @@ def admin_sales_dashboard():
         "SELECT lifecycle_stage,COUNT(*) FROM sales_accounts GROUP BY lifecycle_stage ORDER BY COUNT(*) DESC").fetchall()]
     return render_template("admin_sales_dashboard.html", m=m, sync=sync, segments=segments,
                            priorities=priorities, ratings=ratings, areas=areas, services=services,
-                           top_accounts=top_accounts, lifecycle=lifecycle)
+                           top_accounts=top_accounts, lifecycle=lifecycle, other_provider_count=other_provider_count)
 
 
 @app.get("/admin/sales/work-queue")
