@@ -1184,9 +1184,17 @@ def _cqc_background_worker():
                 db.close()
                 db = None
                 from cqc_sync import run_sync
-                run_sync(limit=100 if sync_type == "limited" else None, dry_run=False, sync_id=sync_id)
-                from account_scoring import score_all
-                score_all()
+                result = run_sync(limit=100 if sync_type == "limited" else None, dry_run=False, sync_id=sync_id)
+                # Full imports deliberately process one bounded page at a time.
+                # Re-queue the same persistent job until both collections are complete.
+                if not result.get("completed"):
+                    db = connect()
+                    db.execute("UPDATE cqc_sync_runs SET status='Queued' WHERE sync_id=?", (sync_id,))
+                    db.commit(); db.close(); db = None
+                    time.sleep(1)
+                else:
+                    from account_scoring import score_all
+                    score_all()
             else:
                 time.sleep(5)
         except Exception as exc:
