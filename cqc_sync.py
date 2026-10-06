@@ -340,23 +340,42 @@ def run_sync(limit=None, dry_run=False, sync_id=None):
             if not items:
                 db.execute("UPDATE cqc_sync_runs SET status='Completed',completed_at=? WHERE sync_id=?",(now_iso(),sync_id)); db.commit()
                 return {"sync_id":sync_id,"completed":True}
+            touched_provider_ids = set()
+            target_locations = 0
             for summary in items:
                 lid = _first(summary, "locationId", "locationID", "id")
                 detail = fetch_location(lid) if lid else summary
                 parent_id = _first(detail, "providerId", "providerID")
+                if parent_id:
+                    touched_provider_ids.add(parent_id)
                 if parent_id and not db.execute("SELECT provider_id FROM cqc_providers WHERE provider_id=?", (parent_id,)).fetchone():
                     _upsert_provider(db, fetch_provider(parent_id))
                 changed += int(_upsert_location(db, detail)); locations_seen += 1
+                service_text = " ".join(
+                    str(_first(x, "code", "name", "description", default=x) if isinstance(x, dict) else x)
+                    for x in (detail.get("serviceTypes") or [])
+                ).lower()
+                specialism_text = " ".join(
+                    str(_first(x, "name", "description", "code", default=x) if isinstance(x, dict) else x)
+                    for x in (detail.get("specialisms") or [])
+                ).lower()
+                target_terms = ("dcc", "domiciliary", "home care", "chn", "chs", "care home",
+                                "sls", "supported living", "complex care", "learning disabil",
+                                "autism", "physical disabil", "mental health")
+                if any(term in (service_text + " " + specialism_text) for term in target_terms):
+                    target_locations += 1
             next_page = lpage + 1
             completed = bool((total_pages and lpage >= total_pages) or len(items) < CQC_PAGE_SIZE)
             db.execute("""UPDATE cqc_sync_runs SET locations_seen=?,records_changed=?,location_page=?,
                           status=?,completed_at=? WHERE sync_id=?""",
                        (locations_seen,changed,next_page,"Completed" if completed else "Running",
                         now_iso() if completed else None,sync_id)); db.commit()
-            print(f"CQC sync {sync_id}: locations page {lpage} committed; {locations_seen} processed", flush=True)
+            print(f"CQC sync {sync_id}: locations page {lpage} committed; {locations_seen} processed; {target_locations} target-care locations on page", flush=True)
             if completed:
                 return {"sync_id":sync_id,"completed":True}
-        return {"sync_id":sync_id,"completed":False,"phase":phase}
+        return {"sync_id":sync_id,"completed":False,"phase":phase,
+                "touched_provider_ids": list(locals().get("touched_provider_ids", [])),
+                "target_locations": locals().get("target_locations", 0)}
     except Exception as exc:
         db.rollback()
         db.execute("UPDATE cqc_sync_runs SET status='Queued',error_message=? WHERE sync_id=?",(str(exc)[:2000],sync_id)); db.commit()
