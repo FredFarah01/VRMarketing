@@ -1200,6 +1200,10 @@ def _cqc_background_worker():
                 # Full imports deliberately process one bounded page at a time.
                 # Re-queue the same persistent job until both collections are complete.
                 if not result.get("completed"):
+                    touched = result.get("touched_provider_ids") or []
+                    if touched:
+                        from account_scoring import score_all
+                        score_all(provider_ids=touched)
                     db = connect()
                     db.execute("UPDATE cqc_sync_runs SET status='Queued' WHERE sync_id=?", (sync_id,))
                     db.commit(); db.close(); db = None
