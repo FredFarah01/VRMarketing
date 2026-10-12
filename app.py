@@ -720,7 +720,7 @@ def admin_cqc_sync():
     db.execute("""INSERT INTO cqc_sync_runs
                   (sync_id, sync_type, status, started_at, providers_seen, locations_seen, records_changed)
                   VALUES (?,?, 'Queued', ?,0,0,0)""",
-               (sync_id, "full" if mode == "full" else "limited", now_iso()))
+               (sync_id, "domiciliary", now_iso()))
     db.commit()
     return redirect(url_for("admin_cqc_prospects", sync="started"))
 
