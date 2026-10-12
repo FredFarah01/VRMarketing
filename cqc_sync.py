@@ -177,18 +177,20 @@ def _upsert_provider(db, record):
 
 def _replace_children(db, location_id, record):
     mappings = (
-        ("cqc_location_service_types", "serviceTypes", "service_type_code", "service_type_name"),
+        ("cqc_location_service_types", "gacServiceTypes", "service_type_code", "service_type_name"),
         ("cqc_location_specialisms", "specialisms", "specialism_code", "specialism_name"),
         ("cqc_location_regulated_activities", "regulatedActivities", "activity_code", "activity_name"),
     )
     for table, source_key, code_col, name_col in mappings:
         db.execute(f"DELETE FROM {table} WHERE location_id = ?", (location_id,))
-        for item in record.get(source_key, []) or []:
+        for item in (record.get(source_key) or (record.get("serviceTypes") if source_key == "gacServiceTypes" else None) or []):
             if isinstance(item, str):
                 code, name = item, item
             elif isinstance(item, dict):
                 code = _first(item, "code", "id", "name")
                 name = _first(item, "name", "description", default=code)
+                if source_key == "gacServiceTypes" and _is_domiciliary_service(item):
+                    code = "DCC"
             else:
                 continue
             if code:
@@ -262,6 +264,15 @@ def _page(path, collection, page):
     return items, int(total_pages) if total_pages else None
 
 
+def _is_domiciliary_service(item):
+    if isinstance(item, dict):
+        code = str(_first(item, "code", "id", default="")).strip().upper()
+        text = " ".join(str(item.get(k) or "") for k in ("name", "description")).lower()
+    else:
+        code, text = str(item).strip().upper(), str(item).lower()
+    return code == "DCC" or "homecare agenc" in text or "domiciliary care" in text
+
+
 def _is_domiciliary_location(detail):
     """Only CQC DCC service-type locations; no fuzzy disability/name matching."""
     if detail.get("deregistrationDate"):
@@ -269,13 +280,8 @@ def _is_domiciliary_location(detail):
     status = str(detail.get("registrationStatus") or detail.get("status") or "").lower()
     if "deregister" in status or "cancel" in status:
         return False
-    for item in detail.get("serviceTypes") or []:
-        if isinstance(item, dict):
-            code = str(_first(item, "code", "id", default="")).upper().strip()
-            name = str(_first(item, "name", "description", default="")).lower()
-        else:
-            code, name = str(item).upper().strip(), str(item).lower()
-        if code == "DCC" or "domiciliary care services" in name:
+    for item in (detail.get("gacServiceTypes") or detail.get("serviceTypes") or []):
+        if _is_domiciliary_service(item):
             return True
     return False
 
@@ -293,8 +299,6 @@ def _run_domiciliary_page(db, sync_id, job):
             continue
         detail = fetch_location(lid)
         scanned += 1
-        if scanned % 100 == 1:
-            print(f"CQC DCC service schema: keys={list(detail.keys())}; serviceTypes={str(detail.get('gacServiceTypes'))[:400]}", flush=True)
         if not _is_domiciliary_location(detail):
             continue
         pid = _first(detail, "providerId", "providerID")
