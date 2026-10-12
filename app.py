@@ -136,6 +136,12 @@ def close_db(_exc):
         db.close()
 
 
+CQC_DCC_RESCAN_MIGRATION = """
+UPDATE cqc_sync_runs SET location_page=1, locations_seen=0, records_changed=0,
+    status='Queued', phase='locations', error_message=NULL
+WHERE sync_type='domiciliary' AND status IN ('Queued','Running');
+"""
+
 CQC_TARGET_FIRST_MIGRATION = """
 -- Existing full jobs imported providers first. Move the active national job to the
 -- location collection, where CQC exposes the service-type/specialism signals that
@@ -219,12 +225,6 @@ MIGRATIONS = [
     CQC_TARGET_FIRST_MIGRATION,
     CQC_DCC_RESCAN_MIGRATION,
 ]
-
-CQC_DCC_RESCAN_MIGRATION = """
-UPDATE cqc_sync_runs SET location_page=1, locations_seen=0, records_changed=0,
-    status='Queued', phase='locations', error_message=NULL
-WHERE sync_type='domiciliary' AND status IN ('Queued','Running');
-"""
 
 PG_MIGRATIONS = [
     MIGRATIONS[0].replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY") + """
