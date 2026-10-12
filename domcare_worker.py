@@ -9,8 +9,8 @@ import subprocess
 import sys
 import time
 
-MAX_PAGES = max(1, min(int(os.environ.get("CQC_PAGES_PER_RUN", "20")), 100))
-MAX_SECONDS = max(60, min(int(os.environ.get("CQC_MAX_RUN_SECONDS", "840")), 3300))
+MAX_PAGES = max(1, min(int(os.environ.get("CQC_PAGES_PER_RUN", "100")), 500))
+MAX_SECONDS = max(60, min(int(os.environ.get("CQC_MAX_RUN_SECONDS", "3300")), 3900))
 
 
 def one_page():
