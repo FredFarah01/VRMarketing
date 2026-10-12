@@ -87,11 +87,11 @@ def _address(record):
     if not isinstance(address, dict):
         address = {}
     return {
-        "address_line1": _first(address, "addressLine1", "line1"),
-        "address_line2": _first(address, "addressLine2", "line2"),
-        "town_city": _first(address, "townCity", "town", "city"),
-        "county": _first(address, "county"),
-        "postcode": _first(address, "postalCode", "postcode"),
+        "address_line1": _first(address, "addressLine1", "line1", default=_first(record, "postalAddressLine1")),
+        "address_line2": _first(address, "addressLine2", "line2", default=_first(record, "postalAddressLine2")),
+        "town_city": _first(address, "townCity", "town", "city", default=_first(record, "postalAddressTownCity")),
+        "county": _first(address, "county", default=_first(record, "postalAddressCounty")),
+        "postcode": _first(address, "postalCode", "postcode", default=_first(record, "postalCode")),
     }
 
 
@@ -230,7 +230,7 @@ def _upsert_location(db, record):
         location_id, provider_id, _first(record, "name", "locationName", default="Unknown location"),
         _first(record, "registrationStatus", "status"), _first(record, "registrationDate"),
         _first(record, "deregistrationDate"), addr["address_line1"], addr["address_line2"],
-        addr["town_city"], addr["county"], addr["postcode"], _first(record, "telephone", "phone"),
+        addr["town_city"], addr["county"], addr["postcode"], _first(record, "mainPhoneNumber", "telephone", "phone"),
         _first(record, "website", "websiteUrl"), overall_rating, rating_date,
         _first(record, "reportPublicationDate", "lastReportPublicationDate"),
         json.dumps(record, separators=(",", ":"), ensure_ascii=False),
