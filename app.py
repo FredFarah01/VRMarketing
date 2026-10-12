@@ -1196,7 +1196,7 @@ def _cqc_background_worker():
         try:
             db = connect()
             job = db.execute("""SELECT sync_id, sync_type FROM cqc_sync_runs
-                                WHERE status='Queued' ORDER BY started_at ASC LIMIT 1""").fetchone()
+                                WHERE status='Queued' AND sync_type='domiciliary' ORDER BY started_at ASC LIMIT 1""").fetchone()
             if job:
                 sync_id, sync_type = job["sync_id"], job["sync_type"]
                 db.close()
