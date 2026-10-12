@@ -1233,6 +1233,12 @@ _recovery_db = connect()
 _recovery_db.execute("""UPDATE cqc_sync_runs SET status='Queued', error_message=?
                         WHERE status='Running'""",
                      ("Worker restarted; queued automatically to resume.",))
+_existing_dcc = _recovery_db.execute("SELECT sync_id FROM cqc_sync_runs WHERE sync_type='domiciliary' LIMIT 1").fetchone()
+if not _existing_dcc:
+    _recovery_db.execute("""INSERT INTO cqc_sync_runs
+        (sync_id,sync_type,status,started_at,providers_seen,locations_seen,records_changed,phase,provider_page,location_page)
+        VALUES (?,?,'Queued',?,0,0,0,'locations',1,1)""",
+        (str(uuid.uuid4()), "domiciliary", now_iso()))
 _recovery_db.commit()
 _recovery_db.close()
 threading.Thread(target=_cqc_background_worker, name="cqc-sync-worker", daemon=True).start()
