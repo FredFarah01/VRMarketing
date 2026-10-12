@@ -217,7 +217,14 @@ MIGRATIONS = [
     CQC_MANAGER_MIGRATION,
     CQC_RESUME_MIGRATION,
     CQC_TARGET_FIRST_MIGRATION,
+    CQC_DCC_RESCAN_MIGRATION,
 ]
+
+CQC_DCC_RESCAN_MIGRATION = """
+UPDATE cqc_sync_runs SET location_page=1, locations_seen=0, records_changed=0,
+    status='Queued', phase='locations', error_message=NULL
+WHERE sync_type='domiciliary' AND status IN ('Queued','Running');
+"""
 
 PG_MIGRATIONS = [
     MIGRATIONS[0].replace("INTEGER PRIMARY KEY AUTOINCREMENT", "SERIAL PRIMARY KEY") + """
@@ -230,6 +237,7 @@ PG_MIGRATIONS = [
     CQC_MANAGER_MIGRATION,
     CQC_RESUME_MIGRATION,
     CQC_TARGET_FIRST_MIGRATION,
+    CQC_DCC_RESCAN_MIGRATION,
 ]
 
 
