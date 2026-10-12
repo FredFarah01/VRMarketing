@@ -293,7 +293,7 @@ def _run_domiciliary_page(db, sync_id, job):
             continue
         detail = fetch_location(lid)
         scanned += 1
-        if scanned == 1 or scanned == 501:
+        if scanned % 100 == 1:
             print(f"CQC DCC service schema: keys={list(detail.keys())}; serviceTypes={str(detail.get('serviceTypes'))[:400]}", flush=True)
         if not _is_domiciliary_location(detail):
             continue
