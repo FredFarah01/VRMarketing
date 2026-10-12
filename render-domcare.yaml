@@ -1,0 +1,24 @@
+services:
+  - type: cron
+    name: veridyn-domcare-fast-import
+    runtime: python
+    repo: https://github.com/FredFarah01/VRMarketing
+    branch: feature/cqc-sales-platform
+    region: frankfurt
+    plan: 4c-16g
+    schedule: '*/10 * * * *'
+    buildCommand: pip install -r requirements.txt
+    startCommand: python domcare_worker.py
+    envVars:
+      - key: DATABASE_URL
+        sync: false
+      - key: CQC_API_KEY
+        sync: false
+      - key: CQC_PAGE_SIZE
+        value: '250'
+      - key: CQC_FETCH_WORKERS
+        value: '6'
+      - key: CQC_PAGES_PER_RUN
+        value: '100'
+      - key: CQC_MAX_RUN_SECONDS
+        value: '3300'
