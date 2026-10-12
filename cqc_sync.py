@@ -16,6 +16,9 @@ import urllib.error
 import urllib.parse
 import urllib.request
 import uuid
+import time
+import random
+from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timezone
 
 from dotenv import load_dotenv
@@ -28,7 +31,9 @@ CQC_API_BASE_URL = os.environ.get("CQC_API_BASE_URL", "https://api.service.cqc.o
 CQC_API_KEY = os.environ.get("CQC_API_KEY", "").strip()
 CQC_API_KEY_HEADER = os.environ.get("CQC_API_KEY_HEADER", "Ocp-Apim-Subscription-Key").strip()
 CQC_PAGE_SIZE = max(1, min(int(os.environ.get("CQC_PAGE_SIZE", "100")), 500))
-TIMEOUT_SECONDS = int(os.environ.get("CQC_API_TIMEOUT", "30"))
+TIMEOUT_SECONDS = int(os.environ.get("CQC_API_TIMEOUT", "20"))
+CQC_FETCH_WORKERS = max(1, min(int(os.environ.get("CQC_FETCH_WORKERS", "6")), 10))
+_SSL_CONTEXT = ssl.create_default_context()
 
 
 def _request_json(path, params=None):
@@ -45,14 +50,20 @@ def _request_json(path, params=None):
             "User-Agent": "VeridynRecruit-CQC-Sync/1.0",
         },
     )
-    try:
-        with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS, context=ssl.create_default_context()) as response:
-            return json.loads(response.read().decode("utf-8"))
-    except urllib.error.HTTPError as exc:
-        body = exc.read().decode("utf-8", errors="replace")[:1000]
-        raise RuntimeError(f"CQC API HTTP {exc.code}: {body}") from exc
-    except urllib.error.URLError as exc:
-        raise RuntimeError(f"CQC API connection failed: {exc.reason}") from exc
+    for attempt in range(5):
+        try:
+            with urllib.request.urlopen(req, timeout=TIMEOUT_SECONDS, context=_SSL_CONTEXT) as response:
+                return json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            if exc.code not in (429, 500, 502, 503, 504) or attempt == 4:
+                raise RuntimeError(f"CQC API HTTP {exc.code} on {path}") from exc
+            retry_after = exc.headers.get("Retry-After", "")
+            delay = float(retry_after) if retry_after.isdigit() else min(16, 2 ** attempt)
+        except (urllib.error.URLError, TimeoutError) as exc:
+            if attempt == 4:
+                raise RuntimeError(f"CQC API request failed for {path}: {exc}") from exc
+            delay = min(16, 2 ** attempt)
+        time.sleep(delay + random.uniform(0, 0.35))
 
 
 def _first(data, *keys, default=None):
@@ -293,23 +304,29 @@ def _run_domiciliary_page(db, sync_id, job):
     changed = int(job["records_changed"] or 0)
     scanned = int(job["locations_seen"] or 0)
     touched = set()
-    for summary in items:
-        lid = _first(summary, "locationId", "locationID", "id")
-        if not lid:
-            continue
-        detail = fetch_location(lid)
-        scanned += 1
-        if not _is_domiciliary_location(detail):
-            continue
+    location_ids = [_first(x, "locationId", "locationID", "id") for x in items]
+    location_ids = [x for x in location_ids if x]
+    # Network I/O is concurrent; database writes remain sequential and transactional.
+    with ThreadPoolExecutor(max_workers=CQC_FETCH_WORKERS) as pool:
+        futures = {pool.submit(fetch_location, lid): lid for lid in location_ids}
+        details = [future.result() for future in as_completed(futures)]
+    scanned += len(details)
+    matches = [detail for detail in details if _is_domiciliary_location(detail)]
+    provider_ids = {_first(detail, "providerId", "providerID") for detail in matches}
+    provider_ids.discard(None)
+    missing = [pid for pid in provider_ids if not db.execute(
+        "SELECT provider_id FROM cqc_providers WHERE provider_id=?", (pid,)).fetchone()]
+    if missing:
+        with ThreadPoolExecutor(max_workers=CQC_FETCH_WORKERS) as pool:
+            provider_details = list(pool.map(fetch_provider, missing))
+        for provider_detail in provider_details:
+            _upsert_provider(db, provider_detail)
+    for detail in matches:
         pid = _first(detail, "providerId", "providerID")
-        if not pid:
-            continue
-        provider = db.execute("SELECT provider_id FROM cqc_providers WHERE provider_id=?", (pid,)).fetchone()
-        if not provider:
-            _upsert_provider(db, fetch_provider(pid))
-        changed += int(_upsert_location(db, detail))
-        touched.add(pid)
-        matched += 1
+        if pid:
+            changed += int(_upsert_location(db, detail))
+            touched.add(pid)
+            matched += 1
     completed = not items or bool((total_pages and page >= total_pages) or len(items) < CQC_PAGE_SIZE)
     db.execute("""UPDATE cqc_sync_runs SET status=?,phase='locations',location_page=?,
                   locations_seen=?,records_changed=?,completed_at=? WHERE sync_id=?""",
