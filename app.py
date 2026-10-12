@@ -1253,7 +1253,10 @@ if not _existing_dcc:
 _recovery_db.execute("UPDATE cqc_sync_runs SET location_page=1, locations_seen=0 WHERE sync_type='domiciliary' AND records_changed=0 AND location_page>1")
 _recovery_db.commit()
 _recovery_db.close()
-threading.Thread(target=_cqc_background_worker, name="cqc-sync-worker", daemon=True).start()
+if os.environ.get("CQC_SYNC_IN_WEB", "0") == "1":
+    threading.Thread(target=_cqc_background_worker, name="cqc-sync-worker", daemon=True).start()
+else:
+    print("CQC import paused on web instance to prevent 512 MiB OOM/502; saved cursor retained.", flush=True)
 print(f"Lead storage: {'Supabase/Postgres' if USE_PG else f'SQLite ({DB_PATH})'}")
 if not PDF_PATH.exists():
     build_checklist_pdf(PDF_PATH)
