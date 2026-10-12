@@ -1242,6 +1242,7 @@ if not _existing_dcc:
         (sync_id,sync_type,status,started_at,providers_seen,locations_seen,records_changed,phase,provider_page,location_page)
         VALUES (?,?,'Queued',?,0,0,0,'locations',1,1)""",
         (str(uuid.uuid4()), "domiciliary", now_iso()))
+_recovery_db.execute("UPDATE cqc_sync_runs SET location_page=1, locations_seen=0 WHERE sync_type='domiciliary' AND records_changed=0 AND location_page>1")
 _recovery_db.commit()
 _recovery_db.close()
 threading.Thread(target=_cqc_background_worker, name="cqc-sync-worker", daemon=True).start()
