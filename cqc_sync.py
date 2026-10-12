@@ -262,6 +262,58 @@ def _page(path, collection, page):
     return items, int(total_pages) if total_pages else None
 
 
+def _is_domiciliary_location(detail):
+    """Only CQC DCC service-type locations; no fuzzy disability/name matching."""
+    if detail.get("deregistrationDate"):
+        return False
+    status = str(detail.get("registrationStatus") or detail.get("status") or "").lower()
+    if "deregister" in status or "cancel" in status:
+        return False
+    for item in detail.get("serviceTypes") or []:
+        if isinstance(item, dict):
+            code = str(_first(item, "code", "id", default="")).upper().strip()
+            name = str(_first(item, "name", "description", default="")).lower()
+        else:
+            code, name = str(item).upper().strip(), str(item).lower()
+        if code == "DCC" or "domiciliary care services" in name:
+            return True
+    return False
+
+
+def _run_domiciliary_page(db, sync_id, job):
+    page = int(job["location_page"] or 1)
+    items, total_pages = _page("locations", "locations", page)
+    matched = 0
+    changed = int(job["records_changed"] or 0)
+    scanned = int(job["locations_seen"] or 0)
+    touched = set()
+    for summary in items:
+        lid = _first(summary, "locationId", "locationID", "id")
+        if not lid:
+            continue
+        detail = fetch_location(lid)
+        scanned += 1
+        if not _is_domiciliary_location(detail):
+            continue
+        pid = _first(detail, "providerId", "providerID")
+        if not pid:
+            continue
+        provider = db.execute("SELECT provider_id FROM cqc_providers WHERE provider_id=?", (pid,)).fetchone()
+        if not provider:
+            _upsert_provider(db, fetch_provider(pid))
+        changed += int(_upsert_location(db, detail))
+        touched.add(pid)
+        matched += 1
+    completed = not items or bool((total_pages and page >= total_pages) or len(items) < CQC_PAGE_SIZE)
+    db.execute("""UPDATE cqc_sync_runs SET status=?,phase='locations',location_page=?,
+                  locations_seen=?,records_changed=?,completed_at=? WHERE sync_id=?""",
+               ("Completed" if completed else "Running", page + 1, scanned, changed,
+                now_iso() if completed else None, sync_id))
+    db.commit()
+    print(f"CQC DCC sync {sync_id}: page {page}; scanned {scanned}; DCC matched {matched}; cumulative matches {changed}", flush=True)
+    return {"sync_id":sync_id,"completed":completed,"touched_provider_ids":list(touched)}
+
+
 def run_sync(limit=None, dry_run=False, sync_id=None):
     """Run a bounded, resumable CQC sync.
 
@@ -291,6 +343,18 @@ def run_sync(limit=None, dry_run=False, sync_id=None):
     if not job:
         db.close()
         raise RuntimeError("CQC sync job not found")
+
+    if job["sync_type"] == "domiciliary":
+        try:
+            return _run_domiciliary_page(db, sync_id, job)
+        except Exception as exc:
+            db.rollback()
+            db.execute("UPDATE cqc_sync_runs SET status='Queued',error_message=? WHERE sync_id=?",
+                       (str(exc)[:2000],sync_id))
+            db.commit()
+            raise
+        finally:
+            db.close()
 
     # Limited sync retains the original simple behaviour.
     if limit:
