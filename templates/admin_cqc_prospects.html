@@ -11,8 +11,8 @@
     <div><h1>CQC Domiciliary Care Prospects</h1><p>{{ total }} domiciliary care agencies matched · CQC DCC-only scan</p></div>
     <form method="post" action="/admin/sales/cqc-sync" style="display:flex;gap:.5rem;align-items:center">
       <input type="hidden" name="csrf_token" value="{{ csrf_token() }}">
-      <input type="hidden" name="mode" value="domiciliary">
-      <button class="btn btn--primary btn--sm" type="submit" {% if sync_is_running %}disabled{% endif %}>{{ 'DCC scan running…' if sync_is_running else 'Sync Domiciliary Care' }}</button>
+      <input type="hidden" name="mode" value="domiciliary"><span class="muted" style="font-size:.8rem">Import temporarily paused to keep portal online</span>
+      <button class="btn btn--primary btn--sm" type="submit" disabled title="Import paused while memory issue is resolved">{{ 'DCC scan running…' if sync_is_running else 'Sync Domiciliary Care' }}</button>
     </form>
   </div>
   {% if sync_notice == 'started' %}<div class="card" style="padding:1rem;margin-bottom:1rem"><strong>CQC sync started.</strong> Refresh this page to see progress.</div>{% elif sync_notice == 'running' %}<div class="card" style="padding:1rem;margin-bottom:1rem"><strong>A CQC sync is already running.</strong></div>{% endif %}
