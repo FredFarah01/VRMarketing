@@ -30,7 +30,7 @@ load_dotenv()
 CQC_API_BASE_URL = os.environ.get("CQC_API_BASE_URL", "https://api.service.cqc.org.uk/public/v1").rstrip("/")
 CQC_API_KEY = os.environ.get("CQC_API_KEY", "").strip()
 CQC_API_KEY_HEADER = os.environ.get("CQC_API_KEY_HEADER", "Ocp-Apim-Subscription-Key").strip()
-CQC_PAGE_SIZE = max(1, min(int(os.environ.get("CQC_PAGE_SIZE", "100")), 500))
+CQC_PAGE_SIZE = max(1, min(int(os.environ.get("CQC_PAGE_SIZE", "250")), 500))
 TIMEOUT_SECONDS = int(os.environ.get("CQC_API_TIMEOUT", "20"))
 CQC_FETCH_WORKERS = max(1, min(int(os.environ.get("CQC_FETCH_WORKERS", "6")), 10))
 _SSL_CONTEXT = ssl.create_default_context()
@@ -40,8 +40,9 @@ def _request_json(path, params=None):
     if not CQC_API_KEY:
         raise RuntimeError("CQC_API_KEY is not configured. Add it to .env before running a live sync.")
     url = f"{CQC_API_BASE_URL}/{path.lstrip('/')}"
-    if params:
-        url += "?" + urllib.parse.urlencode(params)
+    params = dict(params or {})
+    params.setdefault("partnerCode", "VeridynRecruit")
+    url += "?" + urllib.parse.urlencode(params)
     req = urllib.request.Request(
         url,
         headers={
