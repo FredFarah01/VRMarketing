@@ -626,7 +626,10 @@ def filtered_cqc_prospects():
         page = 1
     per_page = 50
     like = "ILIKE" if USE_PG else "LIKE"
-    where = ["1=1"]
+    where = ["""EXISTS (SELECT 1 FROM cqc_locations dcc_l
+        JOIN cqc_location_service_types dcc_st ON dcc_st.location_id=dcc_l.location_id
+        WHERE dcc_l.provider_id=p.provider_id AND UPPER(dcc_st.service_type_code)='DCC'
+        AND dcc_l.deregistration_date IS NULL)"""]
     params = []
     if q:
         where.append(f"""(p.provider_name {like} ? OR EXISTS (
