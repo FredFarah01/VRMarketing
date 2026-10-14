@@ -355,7 +355,8 @@ def index():
 def landing():
     session["form_rendered_at"] = time.time()
     return render_template("landing.html", job_roles=JOB_ROLES, org_sizes=ORG_SIZES,
-                           canonical=request.url_root.rstrip("/") + LANDING_PATH)
+                           canonical=request.url_root.rstrip("/") + LANDING_PATH,
+                           video_ad_ready=(BASE_DIR / "static" / "videos" / "veridyn-recruit-demo.mp4").is_file())
 
 
 @app.get("/resources/care-recruitment-checklist/thank-you")
